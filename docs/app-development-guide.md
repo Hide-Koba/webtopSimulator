@@ -306,3 +306,41 @@ You can use simple built-in servers:
 After making changes, refresh the page in your browser. Check the browser's developer console for any errors.
 
 This structure allows for modular app development, keeping each app's concerns (HTML, JS) largely within its own directory.
+
+## 6. Storing App-Specific Settings (Example: IndexedDB)
+
+Applications can store their own settings (like the last used folder for Media Viewer) using browser storage mechanisms. IndexedDB is recommended for storing complex objects like `DirectoryHandle`s.
+
+### Example: Using IndexedDB in an App
+
+1.  **Define DB constants**:
+    ```javascript
+    const DB_NAME = 'WebDesktopAppSettings'; // Shared DB name
+    const DB_VERSION = 1; // Increment if schema changes
+    const STORE_NAME = 'yourAppNameSettings'; // App-specific store name
+    const YOUR_SETTING_KEY = 'yourSettingKey';
+    ```
+
+2.  **Helper functions for DB operations** (can be part of your app's JS or a shared utility):
+    ```javascript
+    function openDB() { /* ... see MediaViewer for example ... */ }
+    async function getSetting(key) { /* ... see MediaViewer for example ... */ }
+    async function setSetting(key, value) { /* ... see MediaViewer for example ... */ }
+    ```
+
+3.  **Usage**:
+    -   On app load, try to retrieve settings:
+        ```javascript
+        // Inside your app's initializeMyApp or equivalent
+        const lastHandle = await getSetting(YOUR_SETTING_KEY);
+        if (lastHandle) {
+            // Attempt to use/verify the handle
+        }
+        ```
+    -   When a setting changes (e.g., user selects a folder):
+        ```javascript
+        // directoryHandle is the FileSystemDirectoryHandle
+        await setSetting(YOUR_SETTING_KEY, directoryHandle);
+        ```
+
+Refer to `apps/MediaViewer/mediaViewer.js` for a complete implementation example of storing a `DirectoryHandle` in IndexedDB. Remember that permissions for directory handles need to be re-verified across sessions.

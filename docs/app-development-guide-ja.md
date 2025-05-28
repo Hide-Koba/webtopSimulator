@@ -164,3 +164,41 @@ function initializeMyApp(appConfig, appWindowElement) {
 - **Node.js (http-server)**: `http-server` (プロジェクトルートで実行) → `http://localhost:8080`
 
 ブラウザの開発者コンソールでエラーを確認してください。
+
+## 6. アプリ固有設定の保存 (例: IndexedDB)
+
+アプリケーションは、ブラウザのストレージ機構を使用して独自の設定（Media Viewerの最後に使用したフォルダなど）を保存できます。`DirectoryHandle` のような複雑なオブジェクトを保存するには IndexedDB が推奨されます。
+
+### 例: アプリでのIndexedDBの使用
+
+1.  **DB定数の定義**:
+    ```javascript
+    const DB_NAME = 'WebDesktopAppSettings'; // 共有DB名
+    const DB_VERSION = 1; // スキーマ変更時にインクリメント
+    const STORE_NAME = 'yourAppNameSettings'; // アプリ固有のストア名
+    const YOUR_SETTING_KEY = 'yourSettingKey';
+    ```
+
+2.  **DB操作のヘルパー関数** (アプリのJS内、または共有ユーティリティとして):
+    ```javascript
+    function openDB() { /* ... MediaViewerの例を参照 ... */ }
+    async function getSetting(key) { /* ... MediaViewerの例を参照 ... */ }
+    async function setSetting(key, value) { /* ... MediaViewerの例を参照 ... */ }
+    ```
+
+3.  **使用法**:
+    -   アプリ読み込み時に設定を取得試行:
+        ```javascript
+        // アプリのinitializeMyAppまたは同等の関数内
+        const lastHandle = await getSetting(YOUR_SETTING_KEY);
+        if (lastHandle) {
+            // ハンドルの使用/検証を試みる
+        }
+        ```
+    -   設定変更時 (例: ユーザーがフォルダを選択):
+        ```javascript
+        // directoryHandle は FileSystemDirectoryHandle
+        await setSetting(YOUR_SETTING_KEY, directoryHandle);
+        ```
+
+`DirectoryHandle` を IndexedDB に保存する完全な実装例については、`apps/MediaViewer/mediaViewer.js` を参照してください。ディレクトリハンドルの権限はセッションを跨いで再検証する必要があることに注意してください。
