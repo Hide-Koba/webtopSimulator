@@ -1,7 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const taskbar = document.getElementById('taskbar');
-    const openWindows = new Map(); // To keep track of app windows and their taskbar buttons
-    let highestZIndex = 100; // Starting z-index for windows
+    const startButton = document.getElementById('start-button');
+    const startMenuPanel = document.getElementById('start-menu-panel');
+    const openWindows = new Map(); 
+    const appInstances = new Map(); // Stores app instances: { appName: instance }
+    let highestZIndex = 100; 
 
     function loadScript(src, callback) {
         const script = document.createElement('script');
@@ -37,7 +40,11 @@ document.addEventListener('DOMContentLoaded', () => {
         add: (appConfig, appWindowElement) => {
             if (!taskbar) return;
             const existingButton = taskbar.querySelector(`[data-app-id="${appWindowElement.id}"]`);
-            if (existingButton) return existingButton; // Already exists
+            if (existingButton) { // If button exists, just ensure window is visible and front
+                appWindowElement.style.display = 'flex';
+                window.manageTaskbar.bringToFront(appWindowElement.id);
+                return existingButton;
+            }
 
             const button = document.createElement('button');
             button.className = 'taskbar-button';
@@ -45,22 +52,31 @@ document.addEventListener('DOMContentLoaded', () => {
             button.dataset.appId = appWindowElement.id;
             
             button.addEventListener('click', () => {
-                const isHidden = appWindowElement.style.display === 'none';
+                const appInstance = appInstances.get(appConfig.name); // Get the app instance
+                if (!appInstance || !appInstance.appWindowElement) return;
+
+                const targetWindow = appInstance.appWindowElement;
+                const isHidden = targetWindow.style.display === 'none';
+
                 if (isHidden) {
-                    appWindowElement.style.display = 'flex';
-                    window.manageTaskbar.bringToFront(appWindowElement.id);
+                    appInstance.open(); // Use app's open method
                 } else {
-                    if (appWindowElement.style.zIndex == highestZIndex -1) { // If it's already the top-most visible window
-                         appWindowElement.style.display = 'none';
-                         window.manageTaskbar.setInactive(appWindowElement.id);
-                    } else { // If it's not the top-most, bring it to front
-                        window.manageTaskbar.bringToFront(appWindowElement.id);
+                    if (targetWindow.style.zIndex == highestZIndex -1) { 
+                        appInstance.minimize(); 
+                    } else {
+                        appInstance.focus(); 
                     }
                 }
             });
-            taskbar.appendChild(button);
+            // Insert before other taskbar buttons, or after start button if it's the first
+            const firstAppButton = taskbar.querySelector('.taskbar-button');
+            if (firstAppButton) {
+                taskbar.insertBefore(button, firstAppButton);
+            } else {
+                taskbar.appendChild(button);
+            }
+            
             openWindows.set(appWindowElement.id, { windowElement: appWindowElement, taskbarButton: button, config: appConfig });
-            // Set initial z-index when added
             appWindowElement.style.zIndex = highestZIndex++;
             window.manageTaskbar.setActive(appWindowElement.id);
             return button;
@@ -89,29 +105,72 @@ document.addEventListener('DOMContentLoaded', () => {
             const appData = openWindows.get(appWindowId);
             if (appData && appData.windowElement) {
                 appData.windowElement.style.zIndex = highestZIndex++;
-                window.manageTaskbar.setActive(appWindowId); // Also set its taskbar button as active
+                window.manageTaskbar.setActive(appWindowId); 
             }
         }
     };
 
+    function populateStartMenu(apps) {
+        if (!startMenuPanel) return;
+        startMenuPanel.innerHTML = ''; // Clear previous items
+        apps.forEach(appConfig => {
+            const menuItem = document.createElement('div');
+            menuItem.className = 'start-menu-item';
+            menuItem.textContent = appConfig.name;
+            menuItem.addEventListener('click', () => {
+                const appInstance = appInstances.get(appConfig.name);
+                if (appInstance) {
+                    appInstance.open(); // Call the app's open method
+                } else {
+                    console.error(`App instance for ${appConfig.name} not found.`);
+                    // This case implies an app icon was not clicked first to create the instance.
+                    // We might need to simulate an icon click or directly instantiate if not already.
+                    // For now, assumes apps are instantiated by clicking their desktop icon first.
+                    // To handle direct launch from start menu for non-instantiated apps:
+                    const iconToClick = document.getElementById(appConfig.iconId || `${appConfig.name.toLowerCase()}-app-icon`);
+                    if (iconToClick) {
+                        iconToClick.click(); // Simulate icon click to trigger instantiation and open
+                    } else {
+                        console.error(`Icon for ${appConfig.name} not found to simulate click.`);
+                    }
+                }
+                startMenuPanel.classList.add('start-menu-hidden'); // Hide menu after click
+            });
+            startMenuPanel.appendChild(menuItem);
+        });
+    }
+
+    if (startButton && startMenuPanel) {
+        startButton.addEventListener('click', (event) => {
+            event.stopPropagation(); // Prevent click from closing menu immediately if desktop listener is added
+            startMenuPanel.classList.toggle('start-menu-hidden');
+            if (!startMenuPanel.classList.contains('start-menu-hidden')) {
+                 // Optional: bring start menu to a high z-index if it can be overlapped
+                 startMenuPanel.style.zIndex = highestZIndex + 100; // Ensure it's above windows
+            }
+        });
+        // Hide start menu if clicking outside
+        document.addEventListener('click', (event) => {
+            if (!startMenuPanel.classList.contains('start-menu-hidden') && 
+                !startMenuPanel.contains(event.target) && 
+                event.target !== startButton) {
+                startMenuPanel.classList.add('start-menu-hidden');
+            }
+        });
+    }
+
 
     async function loadAppsFromConfig() {
         try {
-            // First, load AppBase.js
-            await new Promise((resolve, reject) => {
-                loadScript('AppBase.js', resolve); // Assuming AppBase.js is in the root
-            });
-
+            await new Promise((resolve) => { loadScript('AppBase.js', resolve); });
             const response = await fetch('config.json');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status} for config.json`);
             const config = await response.json();
 
             if (config && config.apps && Array.isArray(config.apps)) {
+                populateStartMenu(config.apps); // Populate Start Menu
                 const desktopElement = document.getElementById('desktop');
-                if (!desktopElement) {
-                    console.error('Desktop element not found!');
-                    return;
-                }
+                if (!desktopElement) { console.error('Desktop element not found!'); return; }
 
                 for (const app of config.apps) {
                     if (app.css) loadCSS(app.css);
@@ -136,79 +195,60 @@ document.addEventListener('DOMContentLoaded', () => {
                                 const headerButtonsContainer = windowHeader?.querySelector('.window-header-buttons') || document.createElement('div');
                                 if (!headerButtonsContainer.classList.contains('window-header-buttons')) {
                                     headerButtonsContainer.className = 'window-header-buttons';
-                                    // Ensure title span exists if we are creating the buttons container
                                     let titleSpan = windowHeader.querySelector('.window-header-title');
                                     if (!titleSpan) {
-                                        const existingText = Array.from(windowHeader.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
+                                        const existingTextNode = Array.from(windowHeader.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim() !== '');
                                         titleSpan = document.createElement('span');
                                         titleSpan.className = 'window-header-title';
-                                        titleSpan.textContent = existingText ? existingText.textContent.trim() : app.name;
-                                        if(existingText) existingText.remove(); // remove original text node
-                                        windowHeader.prepend(titleSpan); // Add title at the beginning
+                                        titleSpan.textContent = existingTextNode ? existingTextNode.textContent.trim() : app.name;
+                                        if(existingTextNode) existingTextNode.remove();
+                                        windowHeader.prepend(titleSpan);
                                     }
                                     windowHeader.appendChild(headerButtonsContainer);
                                 }
 
-
                                 if (app.minimizable) {
                                     const minimizeButton = document.createElement('button');
                                     minimizeButton.className = 'window-header-button minimize-button';
-                                    minimizeButton.innerHTML = '&#xE921;'; // Minimize icon (Segoe MDL2 Assets) or use text like "_"
+                                    minimizeButton.innerHTML = '&#xE921;'; 
                                     minimizeButton.title = 'Minimize';
-                                    headerButtonsContainer.appendChild(minimizeButton); // Appends to existing buttons or new container
+                                    // Prepend minimize button before close button if close button exists in container
+                                    const closeBtn = headerButtonsContainer.querySelector('.close-button');
+                                    if(closeBtn) {
+                                        headerButtonsContainer.insertBefore(minimizeButton, closeBtn);
+                                    } else {
+                                        headerButtonsContainer.appendChild(minimizeButton);
+                                    }
                                 }
                                 
-                                // Ensure close button is also in this container if it exists
                                 const closeButton = appWindowElement.querySelector('.close-button');
                                 if (closeButton && closeButton.parentElement !== headerButtonsContainer) {
                                      headerButtonsContainer.appendChild(closeButton);
                                 }
-
-
                                 desktopElement.appendChild(appWindowElement);
                                 if (app.resizable) {
                                     const resizeHandle = document.createElement('div');
                                     resizeHandle.className = 'window-resize-handle';
                                     appWindowElement.appendChild(resizeHandle);
                                 }
-                            } else {
-                                console.error(`Could not find .window element in ${app.bodyHtml} for ${app.name}.`);
-                            }
-                        } catch (e) {
-                            console.error(`Error processing bodyHtml for ${app.name}:`, e);
-                        }
+                            } else { console.error(`Could not find .window element in ${app.bodyHtml} for ${app.name}.`); }
+                        } catch (e) { console.error(`Error processing bodyHtml for ${app.name}:`, e); }
                     }
 
                     if (app.script && app.initFunction) {
                         loadScript(app.script, () => {
-                            // Instead of calling a global init function,
-                            // we assume the app script defines a class (e.g., SampleApp) that extends AppBase
-                            // and its constructor will handle initialization.
-                            // The initFunction from config.json could now be the class name.
-                            console.log(`Attempting to find class: ${app.initFunction} on window object for app: ${app.name}`);
-                            const AppClass = window[app.initFunction]; // e.g., window['SampleApp']
-                            
-                            console.log(`Found AppClass for ${app.name}:`, AppClass); // Log what was found
-
-                            if (AppClass && typeof AppClass === 'function' && AppClass.prototype) { // Added AppClass.prototype check
+                            const AppClass = window[app.initFunction];
+                            if (AppClass && typeof AppClass === 'function' && AppClass.prototype) {
                                 try {
-                                    new AppClass(app, appWindowElement);
-                                } catch (e) {
-                                    console.error(`Error instantiating app ${app.name} with class ${app.initFunction}:`, e);
-                                }
-                            } else {
-                                console.error(`App class ${app.initFunction} not found, not a constructor, or not a class for ${app.name}. Type: ${typeof AppClass}`);
-                            }
+                                    const appInstance = new AppClass(app, appWindowElement);
+                                    appInstances.set(app.name, appInstance); // Store the instance
+                                } catch (e) { console.error(`Error instantiating app ${app.name}:`, e); }
+                            } else { console.error(`App class ${app.initFunction} not found for ${app.name}.`); }
                         });
                     }
                 }
-            } else {
-                console.error('Invalid config.json format.');
-            }
-        } catch (e) {
-            console.error('Error in loadAppsFromConfig:', e);
-        }
+            } else { console.error('Invalid config.json format.'); }
+        } catch (e) { console.error('Error in loadAppsFromConfig:', e); }
     }
-
     loadAppsFromConfig();
 });

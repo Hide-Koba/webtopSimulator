@@ -98,6 +98,54 @@ body, html {
     z-index: 1000; /* Ensure taskbar is above desktop content but below active modals/menus if any */
 }
 
+#start-button {
+    background-color: #27ae60; /* Greenish color */
+    color: white;
+    border: none;
+    padding: 0 15px;
+    height: 100%; /* Fill taskbar height */
+    font-weight: bold;
+    cursor: pointer;
+    margin-right: 5px; /* Space before app buttons */
+}
+
+#start-button:hover {
+    background-color: #2ecc71;
+}
+
+#start-menu-panel {
+    position: absolute;
+    bottom: 40px; /* Height of the taskbar */
+    left: 0;
+    width: 250px; /* Width of the start menu */
+    max-height: 400px; /* Max height before scrolling */
+    background-color: #ecf0f1;
+    border: 1px solid #bdc3c7;
+    border-bottom: none; /* No bottom border as it sits on taskbar */
+    box-shadow: 0 -2px 5px rgba(0,0,0,0.1);
+    z-index: 999; /* Below taskbar but above desktop icons/windows if they are lower */
+    overflow-y: auto;
+    padding: 10px;
+    box-sizing: border-box;
+}
+
+#start-menu-panel.start-menu-hidden {
+    display: none;
+}
+
+.start-menu-item {
+    padding: 8px 10px;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-bottom: 5px;
+    background-color: #ffffff;
+    border: 1px solid #dddddd;
+}
+
+.start-menu-item:hover {
+    background-color: #e0e0e0;
+}
+
 .taskbar-button {
     background-color: #34495e;
     color: white;

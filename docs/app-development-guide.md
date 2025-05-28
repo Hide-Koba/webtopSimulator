@@ -6,125 +6,79 @@ This guide explains how to create and integrate new applications into the web de
 
 The web desktop is organized as follows:
 
--   `index.html`: The main HTML file that hosts the desktop.
--   `style.css`: Global styles for the desktop, icons, and windows.
--   `script.js`: Core JavaScript logic for loading apps and managing the desktop environment.
--   `config.json`: Configuration file listing all available applications and their resources.
+-   `index.html`: The main HTML file that hosts the desktop. It includes the taskbar (`id="taskbar"`) and the Start Menu panel (`id="start-menu-panel"`).
+-   `style.css`: Global styles for the desktop, icons, windows, taskbar, Start Button, and Start Menu.
+-   `script.js`: Core JavaScript logic for loading apps, managing the desktop environment, taskbar interactions, Start Menu population and functionality, and window management (drag, resize, maximize, minimize, z-index).
+-   `AppBase.js`: A base class (`AppBase`) that provides common window functionalities. Individual apps extend this class.
+-   `config.json`: Configuration file listing all available applications, their resources (HTML, CSS, JS file paths), window behavior settings (`defaultWidth`, `defaultHeight`, `resizable`, `maximizable`, `minimizable`), and how they appear in the Start Menu. The `initFunction` property here should be the class name of the app.
 -   `apps/`: Directory containing all individual applications.
     -   `apps/YourAppName/`: Each application resides in its own subdirectory.
-        -   `icon.html`: HTML snippet for the application's desktop icon.
-        -   `appbody.html`: HTML snippet for the application's main window structure.
-        -   `yourAppName.js`: JavaScript logic specific to the application.
-        -   `style.css`: (Optional) CSS styles specific to the application.
+        -   `icon.html`: HTML snippet for the application's desktop icon. The ID of the main icon element should be specified in `config.json` via the `iconId` property if it doesn't follow the `appName.toLowerCase() + '-app-icon'` convention.
+        -   `appbody.html`: HTML snippet for the application's main window structure. It's recommended to structure the header with a `.window-header-title` span and a `.window-header-buttons` div for consistency.
+        -   `yourAppName.js`: JavaScript file defining the app's class (e.g., `class YourAppName extends AppBase { ... }`). This class name should match the `initFunction` in `config.json`.
+        -   `style.css`: (Optional) CSS styles specific to this application.
 
 ## 2. Creating a New Application
 
 Follow these steps to create a new application (e.g., "MyApp"):
 
 ### Step 2.1: Create Application Directory
-Create a new folder for your application within the `apps/` directory:
-`apps/MyApp/`
+Create `apps/MyApp/`.
 
 ### Step 2.2: Create Icon HTML (`icon.html`)
-Inside `apps/MyApp/`, create `icon.html`. This file defines the HTML structure for your app's icon on the desktop.
-**Important:** The root element must have a unique `id` that your app's JavaScript will use.
-
 Example (`apps/MyApp/icon.html`):
 ```html
 <div class="icon" id="my-app-icon">
-    <!-- You can use an img tag or other elements for the icon visual -->
     <span>My App</span>
 </div>
 ```
+*(Ensure `my-app-icon` is unique or use the `iconId` property in `config.json`.)*
 
 ### Step 2.3: Create App Body HTML (`appbody.html`)
-Inside `apps/MyApp/`, create `appbody.html`. This file defines the HTML structure for your app's window.
-**Important:**
-- The main window `div` must have the class `window` and a unique `id`.
-- The window header `div` should have the class `window-header`.
-- The close button should have the class `close-button`.
-- The content area `div` should have the class `window-content`.
-
 Example (`apps/MyApp/appbody.html`):
 ```html
-<div class="window" id="my-app-window">
+<div class="window" id="my-app-window"> <!-- Unique ID for the window -->
     <div class="window-header">
-        <span>My App Title</span>
-        <button class="close-button">X</button>
+        <span class="window-header-title">My App Title</span>
+        <div class="window-header-buttons">
+            <!-- Minimize button added by script.js if minimizable -->
+            <button class="close-button window-header-button">X</button>
+        </div>
     </div>
     <div class="window-content">
-        <!-- Your app's UI elements go here -->
         <p>Hello from My App!</p>
     </div>
 </div>
 ```
 
 ### Step 2.4: Create Application JavaScript (`myApp.js`)
-Inside `apps/MyApp/`, create `myApp.js`. This file should define a class that extends `AppBase`.
-The `initFunction` property in `config.json` should be set to the name of this class.
-
+Define a class extending `AppBase`.
 Example (`apps/MyApp/myApp.js`):
 ```javascript
 class MyApp extends AppBase {
     constructor(appConfig, appWindowElement) {
-        super(appConfig, appWindowElement); // Call the AppBase constructor
-        // AppBase constructor calls this.onInit() at the end.
+        super(appConfig, appWindowElement);
     }
-
     onInit() {
-        // This is called by the AppBase constructor.
-        // Add any MyApp-specific initialization here.
-        // For example, getting references to specific UI elements within this app's window:
-        // this.myButton = this.appWindowElement.querySelector('.my-app-button');
-        // if (this.myButton) {
-        //     this.myButton.addEventListener('click', () => this.doSomething());
-        // }
-        if (!this.isValid) return; // Check if AppBase setup failed
-        console.log(`${this.appConfig.name} initialized using AppBase.`);
-    }
-
-    onOpen() {
-        // Called by AppBase when the window is opened/restored.
-        // Add app-specific logic for when the window becomes visible.
         if (!this.isValid) return;
-        console.log(`${this.appConfig.name} opened.`);
+        console.log(`${this.appConfig.name} initialized.`);
+        // Add app-specific init logic here
     }
-
-    onClose() {
-        // Called by AppBase when the window is closed (X button).
-        // Reset any app-specific state here to ensure a "fresh" open next time.
-        if (!this.isValid) return;
-        console.log(`${this.appConfig.name} closed, specific state reset.`);
-        // Example: if (this.myTextarea) this.myTextarea.value = '';
-    }
-
-    // You can override other AppBase lifecycle methods:
-    // onMinimize() { ... }
-    // onToggleMaximize(isNowMaximized) { ... }
-
-    // Add app-specific methods:
-    // doSomething() {
-    //    console.log(`${this.appConfig.name} is doing something!`);
-    // }
+    onOpen() { /* App-specific logic on open */ }
+    onClose() { /* App-specific cleanup on close */ }
+    // Override other AppBase methods or add new ones as needed
 }
-
-// Ensure the class is available globally for script.js to instantiate
-// This is typically automatic for classes defined at the top level of a script.
-// If using modules or bundlers, you might need: window.MyApp = MyApp;
+// window.MyApp = MyApp; // Usually not needed if class name matches initFunction
 ```
-The `AppBase` class handles common functionalities like opening, closing, minimizing, maximizing, dragging, resizing, and basic taskbar interaction. Your app-specific class can focus on its unique features and override `AppBase` methods if custom behavior is needed for those lifecycle events.
 
 ## 3. Update `config.json`
-Add a new entry for your application. The `initFunction` should now be the **name of your app's class**.
-Also, include an `iconId` property if your icon's HTML ID doesn't follow the convention `appName.toLowerCase() + '-app-icon'`.
-
-Example entry for "MyApp":
+Add an entry for "MyApp". `initFunction` must be "MyApp" (the class name).
 ```json
 {
   "name": "MyApp",
-  "iconId": "my-app-icon", // Specific ID of the icon in icon.html
+  "iconId": "my-app-icon", 
   "script": "apps/MyApp/myApp.js",
-  "initFunction": "MyApp", // This must match the class name
+  "initFunction": "MyApp", 
   "iconHtml": "apps/MyApp/icon.html",
   "bodyHtml": "apps/MyApp/appbody.html",
   "css": "apps/MyApp/style.css",
@@ -135,42 +89,20 @@ Example entry for "MyApp":
   "minimizable": true
 }
 ```
-Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax.
-  "iconHtml": "apps/MyApp/icon.html",
-  "bodyHtml": "apps/MyApp/appbody.html",
-  "css": "apps/MyApp/style.css",
-  "defaultWidth": "400px",
-  "defaultHeight": "300px",
-  "resizable": true,
-  "maximizable": true,
-  "minimizable": true
-}
-```
-Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax.
 
 ## 4. Styling Your Application
-- **Global Styles**: General styles for icons (`.icon`), windows (`.window`), headers (`.window-header`), etc., are defined in the main `style.css`.
-- **App-Specific Styles**: Each application can have its own `style.css` file within its directory (e.g., `apps/MyApp/style.css`).
-    - Create this file and add any styles specific to your application.
-    - These styles will be loaded automatically if the `css` path is correctly specified in `config.json` for your app.
-    - This is the recommended way to manage styles unique to your application, keeping them separate from the global `style.css`.
+Use the app-specific `style.css` file (e.g., `apps/MyApp/style.css`). Scope selectors using the window ID (e.g., `#my-app-window .my-class`).
 
-## 5. Running and Testing
-To correctly load `config.json` and the HTML snippets using the `fetch` API, you **must** serve the `index.html` file via an HTTP server. Opening `index.html` directly from the file system (`file:///`) will likely result in CORS errors.
+## 5. App Launching
+- Apps are listed in the Start Menu by their `name` from `config.json`.
+- Clicking an app in the Start Menu will attempt to call the `open()` method of its instance. If not yet instantiated (e.g., desktop icon not clicked first), `script.js` will simulate a click on its desktop icon to trigger the standard instantiation and opening process.
+- Desktop icons also launch apps as before.
 
-You can use simple built-in servers:
-- **Python**: Navigate to the project root in your terminal and run:
-  `python -m http.server`
-  Then open `http://localhost:8000` in your browser.
-- **Node.js (with http-server)**: If you have Node.js, you can install `http-server` globally (`npm install -g http-server`) and then run from the project root:
-  `http-server`
-  Then open the URL provided (usually `http://localhost:8080`).
+## 6. Running and Testing
+Serve `index.html` via an HTTP server (e.g., `python -m http.server`).
 
-After making changes, refresh the page in your browser. Check the browser's developer console for any errors.
-
-This structure allows for modular app development, keeping each app's concerns (HTML, JS) largely within its own directory.
-
-## 6. Storing App-Specific Settings (Example: IndexedDB)
+## 7. Storing App-Specific Settings (Example: IndexedDB)
+(This section remains the same as previously updated, explaining IndexedDB usage for settings like Media Viewer's last folder.)
 
 Applications can store their own settings (like the last used folder for Media Viewer) using browser storage mechanisms. IndexedDB is recommended for storing complex objects like `DirectoryHandle`s.
 
@@ -194,8 +126,8 @@ Applications can store their own settings (like the last used folder for Media V
 3.  **Usage**:
     -   On app load, try to retrieve settings:
         ```javascript
-        // Inside your app's initializeMyApp or equivalent
-        const lastHandle = await getSetting(YOUR_SETTING_KEY);
+        // Inside your app's onInit or onOpen method
+        const lastHandle = await this._getSetting(this.YOUR_SETTING_KEY); // Assuming helpers are part of class
         if (lastHandle) {
             // Attempt to use/verify the handle
         }
@@ -203,7 +135,7 @@ Applications can store their own settings (like the last used folder for Media V
     -   When a setting changes (e.g., user selects a folder):
         ```javascript
         // directoryHandle is the FileSystemDirectoryHandle
-        await setSetting(YOUR_SETTING_KEY, directoryHandle);
+        await this._setSetting(this.YOUR_SETTING_KEY, directoryHandle);
         ```
 
 Refer to `apps/MediaViewer/mediaViewer.js` for a complete implementation example of storing a `DirectoryHandle` in IndexedDB. Remember that permissions for directory handles need to be re-verified across sessions.
