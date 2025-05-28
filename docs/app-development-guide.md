@@ -8,8 +8,9 @@ The web desktop is organized as follows:
 
 -   `index.html`: The main HTML file that hosts the desktop. It includes the taskbar (`id="taskbar"`) and the Start Menu panel (`id="start-menu-panel"`).
 -   `style.css`: Global styles for the desktop, icons, windows, taskbar, Start Button, and Start Menu.
--   `script.js`: Core JavaScript logic for loading apps, managing the desktop environment, taskbar interactions, Start Menu population and functionality, and window management (drag, resize, maximize, minimize, z-index).
--   `AppBase.js`: A base class (`AppBase`) that provides common window functionalities. Individual apps extend this class.
+-   `WebDesktopLib.js`: A supporting library providing core functionalities like DOM manipulation (`WebDesktopLib.DOM`), taskbar management (`WebDesktopLib.Taskbar`), storage utilities (`WebDesktopLib.Storage`), and an event bus (`WebDesktopLib.EventBus`).
+-   `script.js`: Core JavaScript logic for loading the library, apps, managing the desktop environment, taskbar interactions (via `WebDesktopLib.Taskbar`), Start Menu population and functionality, and window management.
+-   `AppBase.js`: A base class (`AppBase`) that provides common window functionalities. Individual apps extend this class and use `WebDesktopLib` for core interactions.
 -   `config.json`: Configuration file listing all available applications, their resources (HTML, CSS, JS file paths), window behavior settings (`defaultWidth`, `defaultHeight`, `resizable`, `maximizable`, `minimizable`), and how they appear in the Start Menu. The `initFunction` property here should be the class name of the app.
 -   `apps/`: Directory containing all individual applications.
     -   `apps/YourAppName/`: Each application resides in its own subdirectory.
@@ -20,36 +21,7 @@ The web desktop is organized as follows:
 
 ## 2. Creating a New Application
 
-Follow these steps to create a new application (e.g., "MyApp"):
-
-### Step 2.1: Create Application Directory
-Create `apps/MyApp/`.
-
-### Step 2.2: Create Icon HTML (`icon.html`)
-Example (`apps/MyApp/icon.html`):
-```html
-<div class="icon" id="my-app-icon">
-    <span>My App</span>
-</div>
-```
-*(Ensure `my-app-icon` is unique or use the `iconId` property in `config.json`.)*
-
-### Step 2.3: Create App Body HTML (`appbody.html`)
-Example (`apps/MyApp/appbody.html`):
-```html
-<div class="window" id="my-app-window"> <!-- Unique ID for the window -->
-    <div class="window-header">
-        <span class="window-header-title">My App Title</span>
-        <div class="window-header-buttons">
-            <!-- Minimize button added by script.js if minimizable -->
-            <button class="close-button window-header-button">X</button>
-        </div>
-    </div>
-    <div class="window-content">
-        <p>Hello from My App!</p>
-    </div>
-</div>
-```
+(Steps 2.1, 2.2, 2.3 remain the same: Create directory, icon.html, appbody.html)
 
 ### Step 2.4: Create Application JavaScript (`myApp.js`)
 Define a class extending `AppBase`.
@@ -57,22 +29,22 @@ Example (`apps/MyApp/myApp.js`):
 ```javascript
 class MyApp extends AppBase {
     constructor(appConfig, appWindowElement) {
-        super(appConfig, appWindowElement);
+        super(appConfig, appWindowElement); // Calls AppBase constructor
     }
-    onInit() {
+    onInit() { // Called by AppBase constructor
         if (!this.isValid) return;
         console.log(`${this.appConfig.name} initialized.`);
-        // Add app-specific init logic here
+        // App-specific init logic, e.g., using WebDesktopLib.DOM:
+        // this.myButton = WebDesktopLib.DOM.qs('.my-button', this.appWindowElement);
     }
-    onOpen() { /* App-specific logic on open */ }
-    onClose() { /* App-specific cleanup on close */ }
-    // Override other AppBase methods or add new ones as needed
+    // Override other AppBase methods (onOpen, onClose, etc.) as needed
 }
-// window.MyApp = MyApp; // Usually not needed if class name matches initFunction
+// window.MyApp = MyApp; // Usually not needed
 ```
+`AppBase` now uses `WebDesktopLib.DOM` for querying elements and `WebDesktopLib.Taskbar` for taskbar interactions.
 
 ## 3. Update `config.json`
-Add an entry for "MyApp". `initFunction` must be "MyApp" (the class name).
+(This section remains the same: `initFunction` is class name, add `iconId` if needed, etc.)
 ```json
 {
   "name": "MyApp",
@@ -80,62 +52,68 @@ Add an entry for "MyApp". `initFunction` must be "MyApp" (the class name).
   "script": "apps/MyApp/myApp.js",
   "initFunction": "MyApp", 
   "iconHtml": "apps/MyApp/icon.html",
-  "bodyHtml": "apps/MyApp/appbody.html",
-  "css": "apps/MyApp/style.css",
-  "defaultWidth": "400px",
-  "defaultHeight": "300px",
-  "resizable": true,
-  "maximizable": true,
-  "minimizable": true
+  // ... other properties
 }
 ```
 
 ## 4. Styling Your Application
-Use the app-specific `style.css` file (e.g., `apps/MyApp/style.css`). Scope selectors using the window ID (e.g., `#my-app-window .my-class`).
+(This section remains the same.)
 
 ## 5. App Launching
-- Apps are listed in the Start Menu by their `name` from `config.json`.
-- Clicking an app in the Start Menu will attempt to call the `open()` method of its instance. If not yet instantiated (e.g., desktop icon not clicked first), `script.js` will simulate a click on its desktop icon to trigger the standard instantiation and opening process.
-- Desktop icons also launch apps as before.
+(This section remains the same.)
 
 ## 6. Running and Testing
-Serve `index.html` via an HTTP server (e.g., `python -m http.server`).
+(This section remains the same: Serve via HTTP server.)
 
 ## 7. Storing App-Specific Settings (Example: IndexedDB)
-(This section remains the same as previously updated, explaining IndexedDB usage for settings like Media Viewer's last folder.)
+Applications can store their own settings using browser storage mechanisms. `WebDesktopLib.Storage` provides simplified wrappers for `localStorage` and IndexedDB.
 
-Applications can store their own settings (like the last used folder for Media Viewer) using browser storage mechanisms. IndexedDB is recommended for storing complex objects like `DirectoryHandle`s.
+-   **`WebDesktopLib.Storage.local.set(key, value)` / `.get(key, defaultValue)`**: For simple key-value string/JSON storage.
+-   **`WebDesktopLib.Storage.indexedDB.set(dbName, version, storeName, key, value, onUpgradeNeededCallback)` / `.get(...)`**: For more complex storage, including objects like `FileSystemDirectoryHandle`.
 
-### Example: Using IndexedDB in an App
+The `onUpgradeNeededCallback` is crucial for IndexedDB to set up object stores. Example:
+```javascript
+// In your app class
+_onUpgradeNeeded(event) {
+    const db = event.target.result;
+    if (!db.objectStoreNames.contains(this.MY_APP_STORE_NAME)) {
+        db.createObjectStore(this.MY_APP_STORE_NAME);
+    }
+}
 
-1.  **Define DB constants**:
-    ```javascript
-    const DB_NAME = 'WebDesktopAppSettings'; // Shared DB name
-    const DB_VERSION = 1; // Increment if schema changes
-    const STORE_NAME = 'yourAppNameSettings'; // App-specific store name
-    const YOUR_SETTING_KEY = 'yourSettingKey';
-    ```
+async saveMySetting(key, value) {
+    await WebDesktopLib.Storage.indexedDB.set(
+        'WebDesktopAppSettings', // Common DB Name
+        1, // DB Version
+        this.MY_APP_STORE_NAME, // Your app's specific store
+        key,
+        value,
+        this._onUpgradeNeeded.bind(this) // Pass the upgrade callback
+    );
+}
+```
+Refer to `apps/MediaViewer/mediaViewer.js` for a complete implementation example of using `WebDesktopLib.Storage.indexedDB` to store a `DirectoryHandle`. Remember that permissions for directory handles need to be re-verified across sessions.
 
-2.  **Helper functions for DB operations** (can be part of your app's JS or a shared utility):
-    ```javascript
-    function openDB() { /* ... see MediaViewer for example ... */ }
-    async function getSetting(key) { /* ... see MediaViewer for example ... */ }
-    async function setSetting(key, value) { /* ... see MediaViewer for example ... */ }
-    ```
+## 8. Inter-Component Communication (Event Bus)
+`WebDesktopLib.EventBus` provides a simple publish/subscribe mechanism for decoupled communication between different parts of the application (e.g., between apps, or app and desktop).
 
-3.  **Usage**:
-    -   On app load, try to retrieve settings:
-        ```javascript
-        // Inside your app's onInit or onOpen method
-        const lastHandle = await this._getSetting(this.YOUR_SETTING_KEY); // Assuming helpers are part of class
-        if (lastHandle) {
-            // Attempt to use/verify the handle
-        }
-        ```
-    -   When a setting changes (e.g., user selects a folder):
-        ```javascript
-        // directoryHandle is the FileSystemDirectoryHandle
-        await this._setSetting(this.YOUR_SETTING_KEY, directoryHandle);
-        ```
+-   **`WebDesktopLib.EventBus.subscribe(eventName, callback)`**: Registers a callback for an event.
+-   **`WebDesktopLib.EventBus.unsubscribe(eventName, callback)`**: Removes a specific callback.
+-   **`WebDesktopLib.EventBus.publish(eventName, data)`**: Dispatches an event with optional data to all subscribers.
 
-Refer to `apps/MediaViewer/mediaViewer.js` for a complete implementation example of storing a `DirectoryHandle` in IndexedDB. Remember that permissions for directory handles need to be re-verified across sessions.
+Example usage:
+```javascript
+// Component A (e.g., an app)
+WebDesktopLib.EventBus.publish('userLoggedIn', { userId: 123, username: 'Alice' });
+
+// Component B (e.g., another app or a UI element in script.js)
+function handleLogin(userData) {
+    console.log(`User ${userData.username} logged in.`);
+    // Update UI or state
+}
+WebDesktopLib.EventBus.subscribe('userLoggedIn', handleLogin);
+
+// To unsubscribe later:
+// WebDesktopLib.EventBus.unsubscribe('userLoggedIn', handleLogin);
+```
+This helps in reducing direct dependencies between components.

@@ -2,9 +2,8 @@ class AppBase {
     constructor(appConfig, appWindowElement) {
         this.appConfig = appConfig;
         this.appWindowElement = appWindowElement;
-        // Use specific iconId from config if provided, otherwise fallback to convention
         const iconId = this.appConfig.iconId || (this.appConfig.name.toLowerCase() + '-app-icon');
-        this.appIcon = document.getElementById(iconId);
+        this.appIcon = WebDesktopLib.DOM.qs(`#${iconId}`); // Use Lib
 
         if (!this.appIcon || !this.appWindowElement) {
             console.warn(`BaseApp: '${this.appConfig.name}' elements not found. Icon: ${this.appIcon}, Window: ${this.appWindowElement}`);
@@ -13,10 +12,10 @@ class AppBase {
         }
         this.isValid = true;
 
-        this.closeButton = this.appWindowElement.querySelector('.close-button');
-        this.minimizeButton = this.appWindowElement.querySelector('.minimize-button');
-        this.windowHeader = this.appWindowElement.querySelector('.window-header');
-        this.resizeHandle = this.appWindowElement.querySelector('.window-resize-handle');
+        this.closeButton = WebDesktopLib.DOM.qs('.close-button', this.appWindowElement);
+        this.minimizeButton = WebDesktopLib.DOM.qs('.minimize-button', this.appWindowElement);
+        this.windowHeader = WebDesktopLib.DOM.qs('.window-header', this.appWindowElement);
+        this.resizeHandle = WebDesktopLib.DOM.qs('.window-resize-handle', this.appWindowElement);
         
         this.taskbarButton = null;
         this.originalDimensions = {
@@ -28,52 +27,34 @@ class AppBase {
         this.isMaximized = false;
 
         this._bindCoreEventListeners();
-        this.onInit(); // Call subclass specific initialization
+        this.onInit();
     }
 
     _bindCoreEventListeners() {
         if (!this.isValid) return;
-
-        // Open window
         this.appIcon.addEventListener('click', () => this.open());
-
-        // Window focus (bring to front)
         this.appWindowElement.addEventListener('mousedown', () => this.focus(), true);
-
-        // Close button
         if (this.closeButton) {
             this.closeButton.addEventListener('click', () => this.close());
         }
-
-        // Minimize button
         if (this.appConfig.minimizable && this.minimizeButton) {
             this.minimizeButton.addEventListener('click', (e) => this.minimize(e));
         }
-
-        // Maximize/Restore on header double-click
         if (this.appConfig.maximizable && this.windowHeader) {
             this.windowHeader.addEventListener('dblclick', (e) => this.toggleMaximize(e));
         }
-
-        // Draggable
-        if (this.windowHeader) {
-            this._makeDraggable();
-        }
-
-        // Resizable
-        if (this.appConfig.resizable && this.resizeHandle) {
-            this._makeResizable();
-        }
+        if (this.windowHeader) this._makeDraggable();
+        if (this.appConfig.resizable && this.resizeHandle) this._makeResizable();
     }
 
     open() {
         if (!this.isValid) return;
         this.appWindowElement.style.display = 'flex';
         
-        if (!this.taskbarButton && window.manageTaskbar) {
-            this.taskbarButton = window.manageTaskbar.add(this.appConfig, this.appWindowElement);
+        if (!this.taskbarButton && WebDesktopLib.Taskbar) { // Use Lib
+            this.taskbarButton = WebDesktopLib.Taskbar.add(this.appConfig, this.appWindowElement);
         }
-        this.focus(); // Also brings to front and sets taskbar active
+        this.focus(); 
 
         if (!this.isMaximized) {
             this.appWindowElement.style.width = this.originalDimensions.width || this.appConfig.defaultWidth;
@@ -88,38 +69,37 @@ class AppBase {
                  this.appWindowElement.style.transform = 'none';
             }
         }
-        this.onOpen(); // Hook for subclasses
+        this.onOpen();
     }
 
     close() {
         if (!this.isValid) return;
         this.appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) {
-            window.manageTaskbar.remove(this.appWindowElement.id);
+        if (WebDesktopLib.Taskbar) { // Use Lib
+            WebDesktopLib.Taskbar.remove(this.appWindowElement.id);
         }
         this.taskbarButton = null;
         this.isMaximized = false;
-        // Reset dimensions to defaults for next fresh open
         this.originalDimensions = {
             width: this.appConfig.defaultWidth,
             height: this.appConfig.defaultHeight,
             top: '50%', left: '50%'
         };
-        this.onClose(); // Hook for subclasses to reset their specific state
+        this.onClose();
     }
 
     minimize(event) {
         if (!this.isValid) return;
         if(event) event.stopPropagation();
         this.appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) window.manageTaskbar.setInactive(this.appWindowElement.id);
-        this.onMinimize(); // Hook for subclasses
+        if (WebDesktopLib.Taskbar) WebDesktopLib.Taskbar.setInactive(this.appWindowElement.id); // Use Lib
+        this.onMinimize();
     }
 
     focus() {
         if (!this.isValid) return;
-        if (window.manageTaskbar) {
-            window.manageTaskbar.bringToFront(this.appWindowElement.id);
+        if (WebDesktopLib.Taskbar) { // Use Lib
+            WebDesktopLib.Taskbar.bringToFront(this.appWindowElement.id);
         }
     }
 
@@ -144,7 +124,7 @@ class AppBase {
             this.appWindowElement.style.transform = 'none';
             this.isMaximized = true;
         }
-        this.onToggleMaximize(this.isMaximized); // Hook for subclasses
+        this.onToggleMaximize(this.isMaximized);
     }
 
     _makeDraggable() {
@@ -168,7 +148,7 @@ class AppBase {
             if (!isDragging) return;
             let newX = e.clientX - dragOffsetX;
             let newY = e.clientY - dragOffsetY;
-            const desktop = document.getElementById('desktop');
+            const desktop = WebDesktopLib.DOM.qs('#desktop'); // Use Lib
             const maxX = desktop.offsetWidth - this.appWindowElement.offsetWidth;
             const maxY = desktop.offsetHeight - this.appWindowElement.offsetHeight;
             newX = Math.max(0, Math.min(newX, maxX));
@@ -180,7 +160,7 @@ class AppBase {
             if (isDragging) {
                 isDragging = false;
                 this.appWindowElement.style.cursor = 'move';
-                if (!this.isMaximized) { // Store position only if not maximized
+                if (!this.isMaximized) {
                     this.originalDimensions.left = this.appWindowElement.style.left;
                     this.originalDimensions.top = this.appWindowElement.style.top;
                 }
@@ -222,7 +202,7 @@ class AppBase {
                 isResizing = false;
                 document.body.style.cursor = 'default';
                 this.appWindowElement.style.userSelect = '';
-                if (!this.isMaximized) { // Store dimensions only if not maximized
+                if (!this.isMaximized) {
                     this.originalDimensions.width = this.appWindowElement.style.width;
                     this.originalDimensions.height = this.appWindowElement.style.height;
                 }
@@ -230,10 +210,9 @@ class AppBase {
         });
     }
 
-    // --- Hooks for subclasses to override ---
-    onInit() { /* Called at the end of constructor */ }
-    onOpen() { /* Called when window is opened/restored */ }
-    onClose() { /* Called when window is closed, for app-specific cleanup */ }
-    onMinimize() { /* Called when window is minimized */ }
-    onToggleMaximize(isNowMaximized) { /* Called after maximize/restore */ }
+    onInit() { }
+    onOpen() { }
+    onClose() { }
+    onMinimize() { }
+    onToggleMaximize(isNowMaximized) { }
 }
