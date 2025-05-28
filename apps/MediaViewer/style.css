@@ -2,9 +2,13 @@
 .media-viewer-select-folder-button {
     margin-left: auto; /* Pushes it to the right, before the close button */
     margin-right: 10px;
-    padding: 3px 8px;
+    padding: 0 12px; /* Increased horizontal padding */
+    height: 24px; /* Match other header buttons if they have a fixed height */
+    line-height: 24px; /* Vertically center text */
     background-color: #3498db;
     color: white;
+    /* Override fixed width from .window-header-button if it was causing issues */
+    width: auto; /* Allow button to size to its content */
     border: none;
     border-radius: 3px;
     cursor: pointer;
