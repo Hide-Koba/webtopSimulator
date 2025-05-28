@@ -5,14 +5,16 @@
       "script": "apps/SampleApp/sampleApp.js",
       "initFunction": "initializeSampleApp",
       "iconHtml": "apps/SampleApp/icon.html",
-      "bodyHtml": "apps/SampleApp/appbody.html"
+      "bodyHtml": "apps/SampleApp/appbody.html",
+      "css": "apps/SampleApp/style.css"
     },
     {
       "name": "NotepadApp",
       "script": "apps/NotepadApp/notepadApp.js",
       "initFunction": "initializeNotepadApp",
       "iconHtml": "apps/NotepadApp/icon.html",
-      "bodyHtml": "apps/NotepadApp/appbody.html"
+      "bodyHtml": "apps/NotepadApp/appbody.html",
+      "css": "apps/NotepadApp/style.css"
     }
   ]
 }

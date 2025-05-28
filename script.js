@@ -12,6 +12,18 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(script);
     }
 
+    // Function to dynamically load a CSS file
+    function loadCSS(href) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = href;
+        link.onerror = () => {
+            console.error(`Error loading CSS: ${href}`);
+        };
+        document.head.appendChild(link);
+    }
+
     // Function to fetch HTML content and inject it into the DOM
     function fetchAndInjectHTML(url, targetElement) {
         return fetch(url)
@@ -46,7 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 for (const app of config.apps) {
-                    // Load HTML for icon and body first
+                    // Load app-specific CSS first
+                    if (app.css) {
+                        loadCSS(app.css);
+                    }
+
+                    // Load HTML for icon and body
                     if (app.iconHtml) {
                         await fetchAndInjectHTML(app.iconHtml, desktopElement);
                     }

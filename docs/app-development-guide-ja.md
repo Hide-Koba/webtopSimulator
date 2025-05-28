@@ -15,6 +15,7 @@ Webデスクトップは以下のように構成されています。
         -   `icon.html`: アプリケーションのデスクトップアイコン用のHTMLスニペット。
         -   `appbody.html`: アプリケーションのメインウィンドウ構造用のHTMLスニペット。
         -   `yourAppName.js`: アプリケーション固有のJavaScriptロジック。
+        -   `style.css`: (オプション) アプリケーション固有のCSSスタイル。
 
 ## 2. 新規アプリケーションの作成
 
@@ -145,16 +146,18 @@ function initializeMyApp() {
   "script": "apps/MyApp/myApp.js",
   "initFunction": "initializeMyApp",
   "iconHtml": "apps/MyApp/icon.html",
-  "bodyHtml": "apps/MyApp/appbody.html"
+  "bodyHtml": "apps/MyApp/appbody.html",
+  "css": "apps/MyApp/style.css"
 }
 ```
 この新しいオブジェクトが `apps` 配列の要素として追加され、正しいJSON構文が維持されていることを確認してください（例：最後のエントリでない場合は、先行するアプリオブジェクトの後にカンマを追加します）。
 
 ## 4. アプリケーションのスタイリング
 - **グローバルスタイル**: アイコン (`.icon`)、ウィンドウ (`.window`)、ヘッダー (`.window-header`) などの一般的なスタイルは、メインの `style.css` で定義されています。
-- **アプリ固有のスタイル**: アプリがそのコンテンツに固有のスタイルを必要とする場合は、次のいずれかの方法があります。
-    - メインの `style.css` ファイルに追加します。おそらく、アプリのウィンドウに固有のクラスでプレフィックスを付けます（例：`#my-app-window .my-custom-class`）。
-    - より複雑なアプリの場合は、アプリ専用のCSSファイルを読み込むことを検討するかもしれませんが、これは現在 `script.js` では処理されていません。
+- **アプリ固有のスタイル**: 各アプリケーションは、そのディレクトリ内に独自の `style.css` ファイルを持つことができます（例：`apps/MyApp/style.css`）。
+    - このファイルを作成し、アプリケーションに固有のスタイルを追加します。
+    - これらのスタイルは、アプリの `config.json` で `css` パスが正しく指定されていれば自動的に読み込まれます。
+    - これは、アプリケーション固有のスタイルを管理し、グローバルな `style.css` から分離するための推奨される方法です。
 
 ## 5. 実行とテスト
 `fetch` APIを使用して `config.json` とHTMLスニペットを正しく読み込むには、HTTPサーバー経由で `index.html` ファイルを提供**しなければなりません**。ファイルシステムから直接 `index.html` を開く (`file:///`) と、CORSエラーが発生する可能性が高くなります。

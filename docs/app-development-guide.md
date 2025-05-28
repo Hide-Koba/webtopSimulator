@@ -15,6 +15,7 @@ The web desktop is organized as follows:
         -   `icon.html`: HTML snippet for the application's desktop icon.
         -   `appbody.html`: HTML snippet for the application's main window structure.
         -   `yourAppName.js`: JavaScript logic specific to the application.
+        -   `style.css`: (Optional) CSS styles specific to the application.
 
 ## 2. Creating a New Application
 
@@ -145,16 +146,18 @@ Example entry for "MyApp":
   "script": "apps/MyApp/myApp.js",
   "initFunction": "initializeMyApp",
   "iconHtml": "apps/MyApp/icon.html",
-  "bodyHtml": "apps/MyApp/appbody.html"
+  "bodyHtml": "apps/MyApp/appbody.html",
+  "css": "apps/MyApp/style.css"
 }
 ```
 Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax (e.g., add a comma after the preceding app object if it's not the last one).
 
 ## 4. Styling Your Application
 - **Global Styles**: General styles for icons (`.icon`), windows (`.window`), headers (`.window-header`), etc., are defined in the main `style.css`.
-- **App-Specific Styles**: If your app requires unique styles for its content, you can:
-    - Add them to the main `style.css` file, perhaps prefixed with a class specific to your app's window (e.g., `#my-app-window .my-custom-class`).
-    - For more complex apps, you might consider loading a dedicated CSS file for your app, though this is not currently handled by `script.js`.
+- **App-Specific Styles**: Each application can have its own `style.css` file within its directory (e.g., `apps/MyApp/style.css`).
+    - Create this file and add any styles specific to your application.
+    - These styles will be loaded automatically if the `css` path is correctly specified in `config.json` for your app.
+    - This is the recommended way to manage styles unique to your application, keeping them separate from the global `style.css`.
 
 ## 5. Running and Testing
 To correctly load `config.json` and the HTML snippets using the `fetch` API, you **must** serve the `index.html` file via an HTTP server. Opening `index.html` directly from the file system (`file:///`) will likely result in CORS errors.
