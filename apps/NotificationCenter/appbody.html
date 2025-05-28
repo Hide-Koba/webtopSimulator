@@ -1,0 +1,20 @@
+<!-- 
+  apps/NotificationCenter/appbody.html
+  HTML structure for the Notification Center window.
+-->
+<div class="window" id="notification-center-window">
+    <div class="window-header">
+        <span class="window-header-title">Notification Center</span>
+        <div class="window-header-buttons">
+            <!-- Minimize button added by script.js -->
+            <button class="notification-center-clear-all window-header-button" title="Clear All Notifications">Clear</button>
+            <button class="close-button window-header-button">X</button>
+        </div>
+    </div>
+    <div class="window-content" id="notification-list-container">
+        <ul id="notification-list">
+            <!-- Notifications will be dynamically added here -->
+            <li class="no-notifications-message">No new notifications.</li>
+        </ul>
+    </div>
+</div>

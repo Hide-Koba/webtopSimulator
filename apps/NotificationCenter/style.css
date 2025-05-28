@@ -1,0 +1,91 @@
+/*
+  apps/NotificationCenter/style.css
+  Styles for the Notification Center app.
+*/
+
+#notification-center-window .window-content {
+    padding: 0; /* Remove padding if list items will have their own */
+    display: flex; /* Allow ul to fill height */
+    flex-direction: column;
+}
+
+#notification-list-container {
+    flex-grow: 1;
+    overflow-y: auto;
+    background-color: #f0f0f0; /* Light grey background for the list area */
+}
+
+#notification-list {
+    list-style-type: none;
+    padding: 10px;
+    margin: 0;
+}
+
+#notification-list .no-notifications-message {
+    color: #888;
+    text-align: center;
+    padding: 20px;
+    font-style: italic;
+}
+
+.notification-item {
+    background-color: #fff;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.notification-title {
+    font-weight: bold;
+    font-size: 1.1em;
+    color: #333;
+}
+
+.notification-app-name {
+    font-size: 0.8em;
+    color: #777;
+    margin-left: 10px;
+}
+
+.notification-message {
+    font-size: 0.95em;
+    color: #555;
+    line-height: 1.4;
+    word-wrap: break-word; /* Ensure long messages wrap */
+}
+
+.notification-timestamp {
+    font-size: 0.75em;
+    color: #999;
+    text-align: right;
+    margin-top: 8px;
+}
+
+/* Different types of notifications */
+.notification-item.type-info .notification-title {
+    color: #2980b9; /* Blue */
+}
+.notification-item.type-warning .notification-title {
+    color: #f39c12; /* Orange */
+}
+.notification-item.type-error .notification-title {
+    color: #c0392b; /* Red */
+}
+
+.notification-center-clear-all {
+    /* Inherits .window-header-button styles */
+    /* Add specific styling if needed, e.g., different color or icon */
+    padding: 0 8px !important; /* Override if needed */
+    width: auto !important; /* Allow text to fit */
+}

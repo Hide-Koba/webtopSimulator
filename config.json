@@ -55,6 +55,20 @@
       "resizable": true,
       "maximizable": true,
       "minimizable": true
+    },
+    {
+      "name": "NotificationCenter",
+      "iconId": "notificationcenter-app-icon",
+      "script": "apps/NotificationCenter/notificationCenter.js",
+      "initFunction": "NotificationCenterApp",
+      "iconHtml": "apps/NotificationCenter/icon.html",
+      "bodyHtml": "apps/NotificationCenter/appbody.html",
+      "css": "apps/NotificationCenter/style.css",
+      "defaultWidth": "350px",
+      "defaultHeight": "400px",
+      "resizable": true,
+      "maximizable": false, 
+      "minimizable": true
     }
   ]
 }
