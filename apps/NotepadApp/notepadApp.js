@@ -51,8 +51,21 @@ function initializeNotepadApp(appConfig, appWindowElement) {
 
     closeButton.addEventListener('click', () => {
         appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id);
+        if (window.manageTaskbar) {
+            window.manageTaskbar.remove(appWindowElement.id);
+        }
         taskbarButton = null;
+        
+        // Reset Notepad specific state
+        const notepadTextarea = appWindowElement.querySelector('.notepad-textarea');
+        if (notepadTextarea) notepadTextarea.value = ''; // Clear text
+        isMaximized = false;
+        originalDimensions = {
+            width: appConfig.defaultWidth,
+            height: appConfig.defaultHeight,
+            top: '50%',
+            left: '50%'
+        };
     });
 
     if (appConfig.minimizable && minimizeButton) {

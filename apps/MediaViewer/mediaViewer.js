@@ -17,7 +17,7 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     let imageFiles = [];
     let directoryHandle = null; // To store the selected directory handle
 
-    // IndexedDB Helper Functions
+    // IndexedDB Helper Functions (same as before)
     const DB_NAME = 'WebDesktopAppSettings';
     const DB_VERSION = 1;
     const STORE_NAME = 'mediaViewerSettings';
@@ -58,7 +58,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
             request.onsuccess = (event) => resolve(event.target.result);
         });
     }
-
     // --- End IndexedDB Helpers ---
 
     let originalDimensions = {
@@ -75,7 +74,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
         mainImage.src = '';
         mainImage.alt = 'Loading images...';
         let foundImages = false;
-
         try {
             for await (const entry of handle.values()) {
                 if (entry.kind === 'file' && (entry.name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i))) {
@@ -84,7 +82,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
                     foundImages = true;
                 }
             }
-
             if (foundImages) {
                 populateThumbnails();
                 if (imageFiles.length > 0) displayImage(0);
@@ -96,22 +93,17 @@ function initializeMediaViewer(appConfig, appWindowElement) {
             console.error("Error reading files from directory handle:", err);
             thumbnailStrip.innerHTML = `<p class="media-viewer-message">Error reading folder: ${err.message}</p>`;
             mainImage.alt = 'Error loading images';
-            directoryHandle = null; // Invalidate handle on error
+            directoryHandle = null; 
             await setSetting(DIR_HANDLE_KEY, null).catch(e => console.error("Error clearing handle", e));
         }
     }
     
     async function verifyAndRequestPermission(handle) {
         const options = { mode: 'read' };
-        if (await handle.queryPermission(options) === 'granted') {
-            return true;
-        }
-        if (await handle.requestPermission(options) === 'granted') {
-            return true;
-        }
-        return false; // Permission denied
+        if (await handle.queryPermission(options) === 'granted') return true;
+        if (await handle.requestPermission(options) === 'granted') return true;
+        return false;
     }
-
 
     async function handleFolderSelection() {
         try {
@@ -139,9 +131,7 @@ function initializeMediaViewer(appConfig, appWindowElement) {
             thumbImg.alt = file.name;
             thumbImg.title = file.name;
             thumbImg.dataset.index = index;
-            thumbImg.addEventListener('click', () => {
-                displayImage(index);
-            });
+            thumbImg.addEventListener('click', () => displayImage(index));
             thumbnailStrip.appendChild(thumbImg);
         });
     }
@@ -149,7 +139,8 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     function displayImage(index) {
         if (index >= 0 && index < imageFiles.length) {
             const file = imageFiles[index];
-            mainImage.src = URL.createObjectURL(file); // Remember to revoke this URL later
+            if (mainImage.src.startsWith('blob:')) URL.revokeObjectURL(mainImage.src); // Revoke previous if any
+            mainImage.src = URL.createObjectURL(file);
             mainImage.alt = file.name;
             updateActiveThumbnail(thumbnailStrip.children[index]);
         }
@@ -171,11 +162,11 @@ function initializeMediaViewer(appConfig, appWindowElement) {
             const handle = await getSetting(DIR_HANDLE_KEY);
             if (handle) {
                 if (await verifyAndRequestPermission(handle)) {
-                    directoryHandle = handle;
+                    directoryHandle = handle; // Keep the handle
                     await loadFilesFromHandle(directoryHandle);
                 } else {
                     thumbnailStrip.innerHTML = '<p class="media-viewer-message">Permission denied for the last folder. Please select a folder.</p>';
-                    directoryHandle = null; // Clear stale handle
+                    directoryHandle = null; 
                     await setSetting(DIR_HANDLE_KEY, null);
                 }
             } else {
@@ -195,7 +186,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
         if (window.manageTaskbar) window.manageTaskbar.bringToFront(appWindowElement.id);
 
         if (!isMaximized) {
-            // ... (existing size/position logic)
             appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
             appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
              if (!originalDimensions.left || originalDimensions.left === "50%") {
@@ -209,10 +199,8 @@ function initializeMediaViewer(appConfig, appWindowElement) {
             }
         }
         
-        if (!directoryHandle && imageFiles.length === 0) { // Only try to load if not already loaded
+        if (imageFiles.length === 0) { // Try to load last folder only if no images are currently loaded
             await tryLoadLastFolder();
-        } else if (imageFiles.length === 0) { // If handle was cleared due to error/denial
-             thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
         }
     });
 
@@ -224,16 +212,29 @@ function initializeMediaViewer(appConfig, appWindowElement) {
 
     closeButton.addEventListener('click', () => {
         appWindowElement.style.display = 'none';
-        // Revoke object URLs for thumbnails and main image to free memory
+        // Revoke object URLs
         Array.from(thumbnailStrip.children).forEach(child => {
             if (child.tagName === 'IMG' && child.src.startsWith('blob:')) URL.revokeObjectURL(child.src);
         });
         if (mainImage.src.startsWith('blob:')) URL.revokeObjectURL(mainImage.src);
         
-        // Don't remove from taskbar, just set inactive if you want to keep state
-        // if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id);
-        // taskbarButton = null;
-        if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
+        // Clear current state for next "fresh" open, but keep directoryHandle from DB
+        imageFiles = [];
+        thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
+        mainImage.src = '';
+        mainImage.alt = 'Selected Media';
+        
+        if (window.manageTaskbar) {
+            window.manageTaskbar.remove(appWindowElement.id);
+        }
+        taskbarButton = null;
+        isMaximized = false;
+        originalDimensions = {
+            width: appConfig.defaultWidth,
+            height: appConfig.defaultHeight,
+            top: '50%',
+            left: '50%'
+        };
     });
 
     if (appConfig.minimizable && minimizeButton) {
@@ -245,7 +246,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     }
 
     if (appConfig.maximizable && windowHeader) {
-        // ... (existing maximize/restore logic)
         windowHeader.addEventListener('dblclick', (e) => {
             if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
             if (isMaximized) {
@@ -275,7 +275,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     }
 
     if (windowHeader) {
-        // ... (existing draggable logic)
         let isDragging = false;
         let dragOffsetX, dragOffsetY;
         windowHeader.addEventListener('mousedown', (e) => {
@@ -315,7 +314,6 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     }
 
     if (appConfig.resizable && resizeHandle) {
-        // ... (existing resizable logic)
         let isResizing = false;
         let resizeInitialX, resizeInitialY, initialWidth, initialHeight;
         resizeHandle.addEventListener('mousedown', (e) => {

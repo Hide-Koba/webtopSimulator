@@ -56,9 +56,27 @@ function initializeSampleApp(appConfig, appWindowElement) {
 
     // --- Close window ---
     closeButton.addEventListener('click', () => {
-        appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id); // Remove from taskbar
-        taskbarButton = null; // Reset taskbar button ref
+        appWindowElement.style.display = 'none'; // Hide the window
+        
+        // Remove from taskbar and internal tracking in script.js
+        if (window.manageTaskbar) {
+            window.manageTaskbar.remove(appWindowElement.id);
+        }
+        taskbarButton = null; // Nullify local reference to taskbar button
+
+        // Reset any app-specific state here if needed for a "fresh" open next time
+        // For SampleApp, there isn't much state beyond its visual/positional state,
+        // which is handled by the open logic (originalDimensions, isMaximized).
+        // If it had, e.g., text in a field, you'd clear it here.
+        isMaximized = false; // Reset maximized state
+        // Reset originalDimensions to reflect config defaults for next open,
+        // or rely on open logic to re-center if no specific position was stored.
+        originalDimensions = {
+            width: appConfig.defaultWidth,
+            height: appConfig.defaultHeight,
+            top: '50%', // Assuming initial centering
+            left: '50%'
+        };
     });
 
     // --- Minimize window ---
