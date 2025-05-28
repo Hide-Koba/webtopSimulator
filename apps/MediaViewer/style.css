@@ -1,0 +1,74 @@
+/* Styles specific to MediaViewer */
+.media-viewer-select-folder-button {
+    margin-left: auto; /* Pushes it to the right, before the close button */
+    margin-right: 10px;
+    padding: 3px 8px;
+    background-color: #3498db;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.media-viewer-select-folder-button:hover {
+    background-color: #2980b9;
+}
+
+#media-viewer-window .window-content {
+    display: flex;
+    flex-direction: column;
+    padding: 5px; /* Reduced padding for tighter layout */
+}
+
+.media-viewer-main-image-container {
+    flex-grow: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #2c3e50; /* Dark background for image viewing */
+    overflow: hidden;
+    margin-bottom: 5px;
+    border-radius: 3px;
+}
+
+#media-viewer-main-image {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.media-viewer-thumbnail-strip {
+    height: 80px; /* Adjust as needed */
+    background-color: #34495e; /* Slightly lighter dark background */
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap; /* Keep thumbnails in a single line */
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.media-viewer-thumbnail-strip img {
+    width: 70px; /* Adjust as needed */
+    height: 70px; /* Adjust as needed */
+    object-fit: cover;
+    margin-right: 5px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    border-radius: 3px;
+    transition: border-color 0.2s;
+}
+
+.media-viewer-thumbnail-strip img:hover {
+    border-color: #3498db;
+}
+
+.media-viewer-thumbnail-strip img.active-thumbnail {
+    border-color: #e74c3c; /* Highlight active thumbnail */
+}
+
+.media-viewer-message {
+    color: #bdc3c7;
+    text-align: center;
+    width: 100%;
+    padding-top: 20px;
+}

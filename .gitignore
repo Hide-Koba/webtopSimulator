@@ -1,0 +1,9 @@
+# Ignore the Upload directory
+Upload/
+
+# Ignore Node.js modules (if you ever use npm)
+node_modules/
+
+# Ignore common OS generated files
+.DS_Store
+Thumbs.db
