@@ -60,84 +60,175 @@ Webデスクトップは以下のように構成されています。
 ```
 
 ### ステップ 2.4: アプリケーションJavaScriptの作成 (`myApp.js`)
-`apps/MyApp/` 内に `myApp.js` (または `yourAppName.js`) を作成します。このファイルには、アプリケーションのJavaScriptロジックが含まれます。
-アプリのHTMLとスクリプトが読み込まれた後にメインの `script.js` によって呼び出される初期化関数（例：`initializeMyApp`）を**必ず**定義する必要があります。
+`apps/MyApp/` 内に `myApp.js` を作成します。このファイルには、アプリケーションのロジックが含まれます。
+初期化関数（例：`initializeMyApp`）を**必ず**定義する必要があります。この関数は `script.js` から以下の2つの引数を受け取ります。
+1.  `appConfig`: `config.json` からのアプリケーション設定オブジェクト。
+2.  `appWindowElement`: アプリケーションのメインウィンドウのDOM要素。
 
 このスクリプトの主なタスク：
-- IDを使用してアイコンとウィンドウ要素への参照を取得します。
-- ウィンドウを開く（アイコンクリック時）および閉じる（閉じるボタンクリック時）ためのイベントリスナーを追加します。
-- ウィンドウのドラッグ機能を実装します。
+- アイコンへの参照を取得します（例：`document.getElementById('my-app-icon')`）。
+- `appWindowElement` を使用して、ウィンドウ内の要素（閉じるボタン、ヘッダー、リサイズハンドルなど）を見つけます。
+- 開閉ロジックを実装します。
+- `appConfig.resizable` と `appConfig.maximizable` に基づいて、ドラッグ可能、リサイズ可能、最大化可能な動作を実装します。
 
 例 (`apps/MyApp/myApp.js`):
 ```javascript
-function initializeMyApp() {
-    const appIcon = document.getElementById('my-app-icon');
-    const appWindow = document.getElementById('my-app-window');
+function initializeMyApp(appConfig, appWindowElement) {
+    // appConfig: { name, script, ..., defaultWidth, defaultHeight, resizable, maximizable }
+    // appWindowElement: このアプリのメインウィンドウのDOM要素
 
-    // 要素が存在することを確認
-    if (!appIcon || !appWindow) {
-        console.warn("MyApp の要素が見つかりません。アプリは初期化されません。");
+    const appIcon = document.getElementById('my-app-icon'); // icon.html とIDを一致させてください
+
+    if (!appIcon || !appWindowElement) {
+        console.warn(`'${appConfig.name}' の要素が見つかりません。Icon: ${appIcon}, Window: ${appWindowElement}`);
         return;
     }
 
-    const closeButton = appWindow.querySelector('.close-button');
-    const windowHeader = appWindow.querySelector('.window-header');
+    const closeButton = appWindowElement.querySelector('.close-button');
+    const windowHeader = appWindowElement.querySelector('.window-header');
+    // リサイズハンドルは appConfig.resizable が true の場合に script.js によって追加されます
+    const resizeHandle = appWindowElement.querySelector('.window-resize-handle'); 
+
+    let originalDimensions = { /* 最大化から復元するために保存 */
+        width: appWindowElement.style.width, height: appWindowElement.style.height,
+        top: appWindowElement.style.top, left: appWindowElement.style.left
+    };
+    let isMaximized = false;
 
     // ウィンドウを開く
     appIcon.addEventListener('click', () => {
-        appWindow.style.display = 'flex'; // または .window のCSSに応じて 'block'
+        appWindowElement.style.display = 'flex';
+        if (!isMaximized) {
+            // デフォルトまたは保存された寸法/位置を適用
+            appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
+            appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
+            if (!originalDimensions.left || originalDimensions.left === "50%") {
+                 appWindowElement.style.left = '50%'; appWindowElement.style.top = '50%';
+                 appWindowElement.style.transform = 'translate(-50%, -50%)';
+            } else {
+                 appWindowElement.style.left = originalDimensions.left; appWindowElement.style.top = originalDimensions.top;
+                 appWindowElement.style.transform = 'none';
+            }
+        }
+        // TODO: ウィンドウを前面に表示するz-index管理を実装
     });
 
     // ウィンドウを閉じる
-    closeButton.addEventListener('click', () => {
-        appWindow.style.display = 'none';
-    });
+    closeButton.addEventListener('click', () => appWindowElement.style.display = 'none');
 
-    // ドラッグ可能なウィンドウのロジック (sampleApp.js や notepadApp.js などの既存アプリからコピー)
-    let isDragging = false;
-    let offsetX, offsetY;
+    // ヘッダーのダブルクリックで最大化/復元
+    if (appConfig.maximizable && windowHeader) {
+        windowHeader.addEventListener('dblclick', (e) => {
+            // ヘッダー内のボタンでのトリガーを回避
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
 
-    windowHeader.addEventListener('mousedown', (e) => {
-        // クリックが閉じるボタン自体の上であればドラッグを防ぐ
-        if (e.target === closeButton) return;
-        isDragging = true;
-        offsetX = e.clientX - appWindow.offsetLeft;
-        offsetY = e.clientY - appWindow.offsetTop;
-        appWindow.style.cursor = 'grabbing';
-        // ウィンドウを前面に表示 (オプション、z-index管理が必要)
-        // document.querySelectorAll('.window').forEach(win => win.style.zIndex = '10');
-        // appWindow.style.zIndex = '11';
-    });
+            if (isMaximized) { // 復元
+                appWindowElement.classList.remove('maximized');
+                appWindowElement.style.width = originalDimensions.width;
+                appWindowElement.style.height = originalDimensions.height;
+                appWindowElement.style.top = originalDimensions.top;
+                appWindowElement.style.left = originalDimensions.left;
+                appWindowElement.style.transform = (originalDimensions.left === '50%') ? 'translate(-50%, -50%)' : 'none';
+                isMaximized = false;
+            } else { // 最大化
+                originalDimensions = { /* 現在の状態を保存 */
+                    width: appWindowElement.style.width, height: appWindowElement.style.height,
+                    top: appWindowElement.style.top, left: appWindowElement.style.left
+                };
+                appWindowElement.classList.add('maximized');
+                appWindowElement.style.transform = 'none'; // transformを解除
+                isMaximized = true;
+            }
+        });
+    }
 
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        let newX = e.clientX - offsetX;
-        let newY = e.clientY - offsetY;
+    // ドラッグ可能なウィンドウ
+    if (windowHeader) {
+        let isDragging = false, dragOffsetX, dragOffsetY;
+        windowHeader.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
+            isDragging = true;
+            appWindowElement.style.transform = 'none'; // 正確なオフセット計算のために重要
+            dragOffsetX = e.clientX - appWindowElement.offsetLeft;
+            dragOffsetY = e.clientY - appWindowElement.offsetTop;
+            appWindowElement.style.cursor = 'grabbing';
+            // TODO: 前面に表示
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let newX = e.clientX - dragOffsetX;
+            let newY = e.clientY - dragOffsetY;
+            const desktop = document.getElementById('desktop');
+            // 基本的な境界衝突判定
+            newX = Math.max(0, Math.min(newX, desktop.offsetWidth - appWindowElement.offsetWidth));
+            newY = Math.max(0, Math.min(newY, desktop.offsetHeight - appWindowElement.offsetHeight));
+            appWindowElement.style.left = `${newX}px`;
+            appWindowElement.style.top = `${newY}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                appWindowElement.style.cursor = 'move';
+                // 最大化されていなければ新しい位置を保存
+                if(!isMaximized) {
+                    originalDimensions.left = appWindowElement.style.left;
+                    originalDimensions.top = appWindowElement.style.top;
+                }
+            }
+        });
+    }
 
-        const desktop = document.getElementById('desktop');
-        const maxX = desktop.offsetWidth - appWindow.offsetWidth;
-        const maxY = desktop.offsetHeight - appWindow.offsetHeight;
-
-        newX = Math.max(0, Math.min(newX, maxX));
-        newY = Math.max(0, Math.min(newY, maxY));
-
-        appWindow.style.left = `${newX}px`;
-        appWindow.style.top = `${newY}px`;
-        appWindow.style.transform = 'none'; // 初期センタリングで設定された transform をクリア
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            appWindow.style.cursor = 'move';
-        }
-    });
+    // リサイズ可能なウィンドウ (有効かつハンドルが存在する場合)
+    if (appConfig.resizable && resizeHandle) {
+        let isResizing = false, resizeInitialX, resizeInitialY, initialWidth, initialHeight;
+        resizeHandle.addEventListener('mousedown', (e) => {
+            if (isMaximized) return;
+            e.stopPropagation(); // ドラッグを防止
+            isResizing = true;
+            resizeInitialX = e.clientX; resizeInitialY = e.clientY;
+            initialWidth = appWindowElement.offsetWidth; initialHeight = appWindowElement.offsetHeight;
+            appWindowElement.style.transform = 'none'; // 直接的なサイジングを保証
+            // 必要であれば50%/50%をピクセル値に変換
+            if (appWindowElement.style.left === '50%') {
+                appWindowElement.style.left = `${appWindowElement.offsetLeft}px`;
+                appWindowElement.style.top = `${appWindowElement.offsetTop}px`;
+            }
+            document.body.style.cursor = 'nwse-resize';
+            appWindowElement.style.userSelect = 'none'; // リサイズ中のテキスト選択を防止
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const dx = e.clientX - resizeInitialX; const dy = e.clientY - resizeInitialY;
+            let newWidth = initialWidth + dx; let newHeight = initialHeight + dy;
+            const minWidth = parseInt(getComputedStyle(appWindowElement).minWidth, 10) || 150;
+            const minHeight = parseInt(getComputedStyle(appWindowElement).minHeight, 10) || 100;
+            newWidth = Math.max(minWidth, newWidth); newHeight = Math.max(minHeight, newHeight);
+            appWindowElement.style.width = `${newWidth}px`;
+            appWindowElement.style.height = `${newHeight}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+                appWindowElement.style.userSelect = '';
+                // 最大化されていなければ新しい寸法を保存
+                if(!isMaximized) {
+                    originalDimensions.width = appWindowElement.style.width;
+                    originalDimensions.height = appWindowElement.style.height;
+                }
+            }
+        });
+    }
 }
 ```
-*(注意: ウィンドウを前面に表示するためのz-index管理は一般的な拡張機能ですが、提供されている基本的なドラッグロジックには完全には実装されていません。複数のウィンドウが重なることが懸念される場合は、これを拡張する必要があるかもしれません。)*
+*(注意: ウィンドウを前面に表示するためのz-index管理は一般的な拡張機能であり、複数のウィンドウでのUX向上のためには実装すべきです。この例ではリサイズ/最大化ロジックに焦点を当てています。)*
 
 ## 3. `config.json` の更新
-`config.json` 内の `apps` 配列に、アプリケーションの新しいエントリを追加します。
+`config.json` 内の `apps` 配列に、アプリケーションの新しいエントリを追加します。新しいウィンドウ動作プロパティを含めます。
+- `defaultWidth` (文字列、例: "400px")
+- `defaultHeight` (文字列、例: "300px")
+- `resizable` (ブール値、`true` または `false`)
+- `maximizable` (ブール値、`true` または `false`)
 
 「MyApp」のエントリ例:
 ```json
@@ -147,10 +238,14 @@ function initializeMyApp() {
   "initFunction": "initializeMyApp",
   "iconHtml": "apps/MyApp/icon.html",
   "bodyHtml": "apps/MyApp/appbody.html",
-  "css": "apps/MyApp/style.css"
+  "css": "apps/MyApp/style.css",
+  "defaultWidth": "400px",
+  "defaultHeight": "300px",
+  "resizable": true,
+  "maximizable": true
 }
 ```
-この新しいオブジェクトが `apps` 配列の要素として追加され、正しいJSON構文が維持されていることを確認してください（例：最後のエントリでない場合は、先行するアプリオブジェクトの後にカンマを追加します）。
+この新しいオブジェクトが `apps` 配列の要素として追加され、正しいJSON構文が維持されていることを確認してください。
 
 ## 4. アプリケーションのスタイリング
 - **グローバルスタイル**: アイコン (`.icon`)、ウィンドウ (`.window`)、ヘッダー (`.window-header`) などの一般的なスタイルは、メインの `style.css` で定義されています。

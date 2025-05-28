@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
             })
             .catch(error => {
                 console.error(`Error fetching or injecting HTML from ${url}:`, error);
+                return Promise.reject(error); // Propagate error to stop further processing if critical
             });
     }
 
@@ -46,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch('config.json');
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`HTTP error! status: ${response.status} for config.json`);
             }
             const config = await response.json();
 
@@ -63,28 +64,66 @@ document.addEventListener('DOMContentLoaded', () => {
                         loadCSS(app.css);
                     }
 
-                    // Load HTML for icon and body
+                    // Load HTML for icon
                     if (app.iconHtml) {
-                        await fetchAndInjectHTML(app.iconHtml, desktopElement);
+                        try {
+                            await fetchAndInjectHTML(app.iconHtml, desktopElement);
+                        } catch (iconError) {
+                            console.error(`Failed to load icon HTML for ${app.name}:`, iconError);
+                            // Decide if to continue or skip app
+                        }
                     }
+                    
+                    let appWindowElement = null;
+                    // Load HTML for body, set size, and add resize handle
                     if (app.bodyHtml) {
-                        await fetchAndInjectHTML(app.bodyHtml, desktopElement);
+                        const tempDiv = document.createElement('div');
+                        try {
+                            const htmlContent = await fetch(app.bodyHtml).then(res => {
+                                if (!res.ok) throw new Error(`Failed to fetch ${app.bodyHtml}: ${res.status} ${res.statusText}`);
+                                return res.text();
+                            });
+                            tempDiv.innerHTML = htmlContent;
+                            // Ensure we get the actual window element, not a wrapper if innerHTML creates one.
+                            appWindowElement = tempDiv.querySelector('.window') || (tempDiv.firstElementChild && tempDiv.firstElementChild.classList.contains('window') ? tempDiv.firstElementChild : null);
+
+
+                            if (appWindowElement) {
+                                if (app.defaultWidth) appWindowElement.style.width = app.defaultWidth;
+                                if (app.defaultHeight) appWindowElement.style.height = app.defaultHeight;
+                                
+                                desktopElement.appendChild(appWindowElement);
+
+                                if (app.resizable) {
+                                    const resizeHandle = document.createElement('div');
+                                    resizeHandle.className = 'window-resize-handle';
+                                    appWindowElement.appendChild(resizeHandle);
+                                }
+                            } else {
+                                console.error(`Could not find a valid .window element in ${app.bodyHtml} for ${app.name}. Content loaded into tempDiv:`, tempDiv.innerHTML);
+                            }
+                        } catch (fetchHtmlError) {
+                            console.error(`Error fetching or processing bodyHtml for ${app.name} from ${app.bodyHtml}:`, fetchHtmlError);
+                        }
                     }
 
-                    // Then load the script and initialize
-                    loadScript(app.script, () => {
-                        if (window[app.initFunction] && typeof window[app.initFunction] === 'function') {
-                            window[app.initFunction]();
-                        } else {
-                            console.error(`Initialization function ${app.initFunction} not found for ${app.name}`);
-                        }
-                    });
+                    // Then load the script and initialize, passing the app config and the window DOM element
+                    if (app.script && app.initFunction) {
+                        loadScript(app.script, () => {
+                            if (window[app.initFunction] && typeof window[app.initFunction] === 'function') {
+                                // Pass the app config object and the window DOM element to the init function
+                                window[app.initFunction](app, appWindowElement); 
+                            } else {
+                                console.error(`Initialization function ${app.initFunction} not found for ${app.name}`);
+                            }
+                        });
+                    }
                 }
             } else {
-                console.error('Invalid config.json format.');
+                console.error('Invalid config.json format or no apps array found.');
             }
         } catch (error) {
-            console.error('Error loading or parsing config.json:', error);
+            console.error('Error in loadAppsFromConfig:', error);
         }
     }
 

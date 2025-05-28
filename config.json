@@ -6,7 +6,11 @@
       "initFunction": "initializeSampleApp",
       "iconHtml": "apps/SampleApp/icon.html",
       "bodyHtml": "apps/SampleApp/appbody.html",
-      "css": "apps/SampleApp/style.css"
+      "css": "apps/SampleApp/style.css",
+      "defaultWidth": "300px",
+      "defaultHeight": "200px",
+      "resizable": true,
+      "maximizable": true
     },
     {
       "name": "NotepadApp",
@@ -14,7 +18,11 @@
       "initFunction": "initializeNotepadApp",
       "iconHtml": "apps/NotepadApp/icon.html",
       "bodyHtml": "apps/NotepadApp/appbody.html",
-      "css": "apps/NotepadApp/style.css"
+      "css": "apps/NotepadApp/style.css",
+      "defaultWidth": "450px",
+      "defaultHeight": "350px",
+      "resizable": true,
+      "maximizable": true
     },
     {
       "name": "MediaViewer",
@@ -22,7 +30,11 @@
       "initFunction": "initializeMediaViewer",
       "iconHtml": "apps/MediaViewer/icon.html",
       "bodyHtml": "apps/MediaViewer/appbody.html",
-      "css": "apps/MediaViewer/style.css"
+      "css": "apps/MediaViewer/style.css",
+      "defaultWidth": "600px",
+      "defaultHeight": "450px",
+      "resizable": true,
+      "maximizable": true
     }
   ]
 }

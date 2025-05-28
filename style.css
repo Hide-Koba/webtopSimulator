@@ -38,17 +38,44 @@ body, html {
 }
 
 .window {
-    width: 400px;
-    height: 300px;
+    /* Default width and height will be set by JS from config */
     background-color: #ffffff;
     border: 1px solid #7f8c8d;
     box-shadow: 0 0 10px rgba(0,0,0,0.5);
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    top: 50%; /* Initial position, can be overridden */
+    left: 50%; /* Initial position, can be overridden */
+    transform: translate(-50%, -50%); /* For initial centering */
     display: none; /* Hidden by default */
     flex-direction: column;
+    min-width: 200px; /* Prevent making window too small */
+    min-height: 150px; /* Prevent making window too small */
+    overflow: hidden; /* Important for resize handle positioning */
+}
+
+.window.maximized {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    transform: none !important;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+
+.window-resize-handle {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 15px;
+    height: 15px;
+    cursor: nwse-resize;
+    /* background: repeating-linear-gradient( -45deg, rgba(0,0,0,0.1), rgba(0,0,0,0.1) 1px, transparent 1px, transparent 3px ); */
+    /* Simple visual cue for now, can be an icon or styled div */
+    border-bottom: 3px solid #7f8c8d;
+    border-right: 3px solid #7f8c8d;
+    box-sizing: border-box;
 }
 
 .window-header {

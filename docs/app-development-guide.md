@@ -60,84 +60,175 @@ Example (`apps/MyApp/appbody.html`):
 ```
 
 ### Step 2.4: Create Application JavaScript (`myApp.js`)
-Inside `apps/MyApp/`, create `myApp.js` (or `yourAppName.js`). This file contains the JavaScript logic for your application.
-It **must** define an initialization function (e.g., `initializeMyApp`) that will be called by the main `script.js` after the app's HTML and script are loaded.
+Inside `apps/MyApp/`, create `myApp.js`. This file contains your application's logic.
+It **must** define an initialization function (e.g., `initializeMyApp`). This function will receive two arguments from `script.js`:
+1.  `appConfig`: The application's configuration object from `config.json`.
+2.  `appWindowElement`: The DOM element for the application's main window.
 
 Key tasks for this script:
-- Get references to the icon and window elements using their IDs.
-- Add event listeners for opening the window (on icon click) and closing the window (on close button click).
-- Implement draggable functionality for the window.
+- Get references to the icon (e.g., `document.getElementById('my-app-icon')`).
+- Use `appWindowElement` to find elements within the window (e.g., close button, header, resize handle).
+- Implement open/close logic.
+- Implement draggable, resizable, and maximizable behaviors based on `appConfig.resizable` and `appConfig.maximizable`.
 
 Example (`apps/MyApp/myApp.js`):
 ```javascript
-function initializeMyApp() {
-    const appIcon = document.getElementById('my-app-icon');
-    const appWindow = document.getElementById('my-app-window');
+function initializeMyApp(appConfig, appWindowElement) {
+    // appConfig: { name, script, ..., defaultWidth, defaultHeight, resizable, maximizable }
+    // appWindowElement: The main DOM element for this app's window
 
-    // Ensure elements exist
-    if (!appIcon || !appWindow) {
-        console.warn("MyApp elements not found. App will not initialize.");
+    const appIcon = document.getElementById('my-app-icon'); // Make sure this ID matches your icon.html
+
+    if (!appIcon || !appWindowElement) {
+        console.warn(`'${appConfig.name}' elements not found. Icon: ${appIcon}, Window: ${appWindowElement}`);
         return;
     }
 
-    const closeButton = appWindow.querySelector('.close-button');
-    const windowHeader = appWindow.querySelector('.window-header');
+    const closeButton = appWindowElement.querySelector('.close-button');
+    const windowHeader = appWindowElement.querySelector('.window-header');
+    // Resize handle is added by script.js if appConfig.resizable is true
+    const resizeHandle = appWindowElement.querySelector('.window-resize-handle'); 
+
+    let originalDimensions = { /* Store for restore from maximize */
+        width: appWindowElement.style.width, height: appWindowElement.style.height,
+        top: appWindowElement.style.top, left: appWindowElement.style.left
+    };
+    let isMaximized = false;
 
     // Open window
     appIcon.addEventListener('click', () => {
-        appWindow.style.display = 'flex'; // Or 'block', depending on your CSS for .window
+        appWindowElement.style.display = 'flex';
+        if (!isMaximized) {
+            // Apply default or stored dimensions/position
+            appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
+            appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
+            if (!originalDimensions.left || originalDimensions.left === "50%") {
+                 appWindowElement.style.left = '50%'; appWindowElement.style.top = '50%';
+                 appWindowElement.style.transform = 'translate(-50%, -50%)';
+            } else {
+                 appWindowElement.style.left = originalDimensions.left; appWindowElement.style.top = originalDimensions.top;
+                 appWindowElement.style.transform = 'none';
+            }
+        }
+        // TODO: Implement z-index management to bring window to front
     });
 
     // Close window
-    closeButton.addEventListener('click', () => {
-        appWindow.style.display = 'none';
-    });
+    closeButton.addEventListener('click', () => appWindowElement.style.display = 'none');
 
-    // Draggable window logic (copy from existing apps like sampleApp.js or notepadApp.js)
-    let isDragging = false;
-    let offsetX, offsetY;
+    // Maximize/Restore on header double-click
+    if (appConfig.maximizable && windowHeader) {
+        windowHeader.addEventListener('dblclick', (e) => {
+            // Avoid triggering on buttons within header
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
 
-    windowHeader.addEventListener('mousedown', (e) => {
-        // Prevent dragging if the click is on the close button itself
-        if (e.target === closeButton) return;
-        isDragging = true;
-        offsetX = e.clientX - appWindow.offsetLeft;
-        offsetY = e.clientY - appWindow.offsetTop;
-        appWindow.style.cursor = 'grabbing';
-        // Bring window to front (optional, requires z-index management)
-        // document.querySelectorAll('.window').forEach(win => win.style.zIndex = '10');
-        // appWindow.style.zIndex = '11';
-    });
+            if (isMaximized) { // Restore
+                appWindowElement.classList.remove('maximized');
+                appWindowElement.style.width = originalDimensions.width;
+                appWindowElement.style.height = originalDimensions.height;
+                appWindowElement.style.top = originalDimensions.top;
+                appWindowElement.style.left = originalDimensions.left;
+                appWindowElement.style.transform = (originalDimensions.left === '50%') ? 'translate(-50%, -50%)' : 'none';
+                isMaximized = false;
+            } else { // Maximize
+                originalDimensions = { /* Save current state */
+                    width: appWindowElement.style.width, height: appWindowElement.style.height,
+                    top: appWindowElement.style.top, left: appWindowElement.style.left
+                };
+                appWindowElement.classList.add('maximized');
+                appWindowElement.style.transform = 'none'; // Remove any transform
+                isMaximized = true;
+            }
+        });
+    }
 
-    document.addEventListener('mousemove', (e) => {
-        if (!isDragging) return;
-        let newX = e.clientX - offsetX;
-        let newY = e.clientY - offsetY;
+    // Draggable window
+    if (windowHeader) {
+        let isDragging = false, dragOffsetX, dragOffsetY;
+        windowHeader.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
+            isDragging = true;
+            appWindowElement.style.transform = 'none'; // Crucial for correct offset calculation
+            dragOffsetX = e.clientX - appWindowElement.offsetLeft;
+            dragOffsetY = e.clientY - appWindowElement.offsetTop;
+            appWindowElement.style.cursor = 'grabbing';
+            // TODO: Bring to front
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            let newX = e.clientX - dragOffsetX;
+            let newY = e.clientY - dragOffsetY;
+            const desktop = document.getElementById('desktop');
+            // Basic boundary collision
+            newX = Math.max(0, Math.min(newX, desktop.offsetWidth - appWindowElement.offsetWidth));
+            newY = Math.max(0, Math.min(newY, desktop.offsetHeight - appWindowElement.offsetHeight));
+            appWindowElement.style.left = `${newX}px`;
+            appWindowElement.style.top = `${newY}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                appWindowElement.style.cursor = 'move';
+                // Store new position for restore if not maximized
+                if(!isMaximized) {
+                    originalDimensions.left = appWindowElement.style.left;
+                    originalDimensions.top = appWindowElement.style.top;
+                }
+            }
+        });
+    }
 
-        const desktop = document.getElementById('desktop');
-        const maxX = desktop.offsetWidth - appWindow.offsetWidth;
-        const maxY = desktop.offsetHeight - appWindow.offsetHeight;
-
-        newX = Math.max(0, Math.min(newX, maxX));
-        newY = Math.max(0, Math.min(newY, maxY));
-
-        appWindow.style.left = `${newX}px`;
-        appWindow.style.top = `${newY}px`;
-        appWindow.style.transform = 'none'; // Clear transform if set by initial centering
-    });
-
-    document.addEventListener('mouseup', () => {
-        if (isDragging) {
-            isDragging = false;
-            appWindow.style.cursor = 'move';
-        }
-    });
+    // Resizable window (if enabled and handle exists)
+    if (appConfig.resizable && resizeHandle) {
+        let isResizing = false, resizeInitialX, resizeInitialY, initialWidth, initialHeight;
+        resizeHandle.addEventListener('mousedown', (e) => {
+            if (isMaximized) return;
+            e.stopPropagation(); // Prevent drag
+            isResizing = true;
+            resizeInitialX = e.clientX; resizeInitialY = e.clientY;
+            initialWidth = appWindowElement.offsetWidth; initialHeight = appWindowElement.offsetHeight;
+            appWindowElement.style.transform = 'none'; // Ensure direct sizing
+            // Convert 50%/50% to pixel values if needed
+            if (appWindowElement.style.left === '50%') {
+                appWindowElement.style.left = `${appWindowElement.offsetLeft}px`;
+                appWindowElement.style.top = `${appWindowElement.offsetTop}px`;
+            }
+            document.body.style.cursor = 'nwse-resize';
+            appWindowElement.style.userSelect = 'none'; // Prevent text selection during resize
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const dx = e.clientX - resizeInitialX; const dy = e.clientY - resizeInitialY;
+            let newWidth = initialWidth + dx; let newHeight = initialHeight + dy;
+            const minWidth = parseInt(getComputedStyle(appWindowElement).minWidth, 10) || 150;
+            const minHeight = parseInt(getComputedStyle(appWindowElement).minHeight, 10) || 100;
+            newWidth = Math.max(minWidth, newWidth); newHeight = Math.max(minHeight, newHeight);
+            appWindowElement.style.width = `${newWidth}px`;
+            appWindowElement.style.height = `${newHeight}px`;
+        });
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+                appWindowElement.style.userSelect = '';
+                 // Store new dimensions for restore if not maximized
+                if(!isMaximized) {
+                    originalDimensions.width = appWindowElement.style.width;
+                    originalDimensions.height = appWindowElement.style.height;
+                }
+            }
+        });
+    }
 }
 ```
-*(Note: The z-index management for bringing windows to the front is a common enhancement but is not fully implemented in the base draggable logic provided. You might need to expand on this if multiple windows overlapping is a concern.)*
+*(Note: The z-index management for bringing windows to the front is a common enhancement and should be implemented for better UX with multiple windows. This example focuses on the resize/maximize logic.)*
 
 ## 3. Update `config.json`
-Add a new entry for your application in the `apps` array within `config.json`.
+Add a new entry for your application in the `apps` array within `config.json`. Include the new window behavior properties:
+- `defaultWidth` (string, e.g., "400px")
+- `defaultHeight` (string, e.g., "300px")
+- `resizable` (boolean, `true` or `false`)
+- `maximizable` (boolean, `true` or `false`)
 
 Example entry for "MyApp":
 ```json
@@ -147,10 +238,14 @@ Example entry for "MyApp":
   "initFunction": "initializeMyApp",
   "iconHtml": "apps/MyApp/icon.html",
   "bodyHtml": "apps/MyApp/appbody.html",
-  "css": "apps/MyApp/style.css"
+  "css": "apps/MyApp/style.css",
+  "defaultWidth": "400px",
+  "defaultHeight": "300px",
+  "resizable": true,
+  "maximizable": true
 }
 ```
-Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax (e.g., add a comma after the preceding app object if it's not the last one).
+Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax.
 
 ## 4. Styling Your Application
 - **Global Styles**: General styles for icons (`.icon`), windows (`.window`), headers (`.window-header`), etc., are defined in the main `style.css`.
