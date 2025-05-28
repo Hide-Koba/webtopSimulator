@@ -1,0 +1,22 @@
+<!-- 
+  apps/TemplateApp/appbody.html
+  HTML structure for the TemplateApp's main window.
+  The root .window div ID should be unique (e.g., "template-app-window").
+-->
+<div class="window" id="template-app-window">
+    <div class="window-header">
+        <span class="window-header-title">Template App</span>
+        <div class="window-header-buttons">
+            <!-- Minimize button is added by script.js if appConfig.minimizable is true -->
+            <!-- Close button is also typically part of this container -->
+            <button class="close-button window-header-button">X</button>
+        </div>
+    </div>
+    <div class="window-content">
+        <h2>Welcome to Template App!</h2>
+        <p>This is a starting point for building new applications.</p>
+        <p>You can add your custom HTML content here.</p>
+        <button class="template-app-button">Click Me!</button>
+        <p id="template-app-message"></p>
+    </div>
+</div>

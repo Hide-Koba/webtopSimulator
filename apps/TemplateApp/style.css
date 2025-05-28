@@ -1,0 +1,31 @@
+/*
+  apps/TemplateApp/style.css
+  App-specific styles for TemplateApp.
+  These styles will only apply to elements within this app's window
+  if selectors are appropriately scoped (e.g., by using the window's ID).
+*/
+
+/* Example: Style the button and message paragraph in TemplateApp */
+#template-app-window .template-app-button {
+    background-color: #4CAF50; /* Green */
+    border: none;
+    color: white;
+    padding: 10px 20px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 10px 0;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+#template-app-window .template-app-button:hover {
+    background-color: #45a049;
+}
+
+#template-app-window #template-app-message {
+    margin-top: 10px;
+    color: #333;
+    font-style: italic;
+}

@@ -41,6 +41,20 @@
       "resizable": true,
       "maximizable": true,
       "minimizable": true
+    },
+    {
+      "name": "TemplateApp",
+      "iconId": "template-app-icon",
+      "script": "apps/TemplateApp/templateApp.js",
+      "initFunction": "TemplateApp",
+      "iconHtml": "apps/TemplateApp/icon.html",
+      "bodyHtml": "apps/TemplateApp/appbody.html",
+      "css": "apps/TemplateApp/style.css",
+      "defaultWidth": "400px",
+      "defaultHeight": "300px",
+      "resizable": true,
+      "maximizable": true,
+      "minimizable": true
     }
   ]
 }
