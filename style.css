@@ -1,0 +1,76 @@
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: sans-serif;
+}
+
+#desktop {
+    width: 100%;
+    height: 100%;
+    background-color: #3498db; /* A blue background, like a desktop */
+    position: relative;
+    overflow: hidden;
+    padding: 20px; /* Add some padding for icons */
+}
+
+.icon {
+    width: 80px;
+    height: 80px;
+    background-color: #ecf0f1;
+    border: 1px solid #bdc3c7;
+    border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    cursor: pointer;
+    margin: 10px;
+    float: left; /* Arrange icons from the left */
+}
+
+.icon span {
+    font-size: 12px;
+    margin-top: 5px;
+}
+
+.window {
+    width: 400px;
+    height: 300px;
+    background-color: #ffffff;
+    border: 1px solid #7f8c8d;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none; /* Hidden by default */
+    flex-direction: column;
+}
+
+.window-header {
+    background-color: #95a5a6;
+    color: white;
+    padding: 10px;
+    cursor: move; /* For dragging later */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.window-header .close-button {
+    background: red;
+    color: white;
+    border: none;
+    padding: 5px 10px;
+    cursor: pointer;
+}
+
+.window-content {
+    padding: 15px;
+    flex-grow: 1;
+    overflow-y: auto;
+}
