@@ -97,6 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function loadAppsFromConfig() {
         try {
+            // First, load AppBase.js
+            await new Promise((resolve, reject) => {
+                loadScript('AppBase.js', resolve); // Assuming AppBase.js is in the root
+            });
+
             const response = await fetch('config.json');
             if (!response.ok) throw new Error(`HTTP error! status: ${response.status} for config.json`);
             const config = await response.json();
@@ -176,10 +181,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (app.script && app.initFunction) {
                         loadScript(app.script, () => {
-                            if (window[app.initFunction]) {
-                                window[app.initFunction](app, appWindowElement);
+                            // Instead of calling a global init function,
+                            // we assume the app script defines a class (e.g., SampleApp) that extends AppBase
+                            // and its constructor will handle initialization.
+                            // The initFunction from config.json could now be the class name.
+                            console.log(`Attempting to find class: ${app.initFunction} on window object for app: ${app.name}`);
+                            const AppClass = window[app.initFunction]; // e.g., window['SampleApp']
+                            
+                            console.log(`Found AppClass for ${app.name}:`, AppClass); // Log what was found
+
+                            if (AppClass && typeof AppClass === 'function' && AppClass.prototype) { // Added AppClass.prototype check
+                                try {
+                                    new AppClass(app, appWindowElement);
+                                } catch (e) {
+                                    console.error(`Error instantiating app ${app.name} with class ${app.initFunction}:`, e);
+                                }
                             } else {
-                                console.error(`Init function ${app.initFunction} not found for ${app.name}.`);
+                                console.error(`App class ${app.initFunction} not found, not a constructor, or not a class for ${app.name}. Type: ${typeof AppClass}`);
                             }
                         });
                     }

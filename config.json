@@ -2,8 +2,9 @@
   "apps": [
     {
       "name": "SampleApp",
+      "iconId": "sample-app-icon",
       "script": "apps/SampleApp/sampleApp.js",
-      "initFunction": "initializeSampleApp",
+      "initFunction": "SampleApp",
       "iconHtml": "apps/SampleApp/icon.html",
       "bodyHtml": "apps/SampleApp/appbody.html",
       "css": "apps/SampleApp/style.css",
