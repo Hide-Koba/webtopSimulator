@@ -16,8 +16,9 @@
     },
     {
       "name": "NotepadApp",
+      "iconId": "notepad-app-icon",
       "script": "apps/NotepadApp/notepadApp.js",
-      "initFunction": "initializeNotepadApp",
+      "initFunction": "NotepadApp",
       "iconHtml": "apps/NotepadApp/icon.html",
       "bodyHtml": "apps/NotepadApp/appbody.html",
       "css": "apps/NotepadApp/style.css",
@@ -29,8 +30,9 @@
     },
     {
       "name": "MediaViewer",
+      "iconId": "media-viewer-icon",
       "script": "apps/MediaViewer/mediaViewer.js",
-      "initFunction": "initializeMediaViewer",
+      "initFunction": "MediaViewerApp", 
       "iconHtml": "apps/MediaViewer/icon.html",
       "bodyHtml": "apps/MediaViewer/appbody.html",
       "css": "apps/MediaViewer/style.css",

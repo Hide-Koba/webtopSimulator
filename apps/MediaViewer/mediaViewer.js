@@ -1,358 +1,199 @@
-function initializeMediaViewer(appConfig, appWindowElement) {
-    const appIcon = document.getElementById('media-viewer-icon');
-    
-    if (!appIcon || !appWindowElement) {
-        console.warn(`${appConfig.name || 'App'} elements not found. App will not initialize.`);
-        return;
+class MediaViewerApp extends AppBase {
+    constructor(appConfig, appWindowElement) {
+        super(appConfig, appWindowElement);
+        if (!this.isValid) return;
+
+        this.selectFolderButton = this.appWindowElement.querySelector('.media-viewer-select-folder-button');
+        this.mainImage = this.appWindowElement.querySelector('#media-viewer-main-image'); // ID is within its own appbody.html
+        this.thumbnailStrip = this.appWindowElement.querySelector('.media-viewer-thumbnail-strip');
+        
+        this.imageFiles = [];
+        this.directoryHandle = null;
+
+        // IndexedDB constants (could be static properties if preferred)
+        this.DB_NAME = 'WebDesktopAppSettings';
+        this.DB_VERSION = 1;
+        this.STORE_NAME = 'mediaViewerSettings'; // App-specific store
+        this.DIR_HANDLE_KEY = `${this.appConfig.name}_lastDirectoryHandle`; // Unique key per app instance if needed, or global for type
+
+        this._bindMediaViewerEventListeners();
     }
 
-    const closeButton = appWindowElement.querySelector('.close-button');
-    const minimizeButton = appWindowElement.querySelector('.minimize-button');
-    const windowHeader = appWindowElement.querySelector('.window-header');
-    const resizeHandle = appWindowElement.querySelector('.window-resize-handle');
-    const selectFolderButton = appWindowElement.querySelector('.media-viewer-select-folder-button');
-    const mainImage = document.getElementById('media-viewer-main-image');
-    let taskbarButton = null;
-    const thumbnailStrip = appWindowElement.querySelector('.media-viewer-thumbnail-strip');
-    let imageFiles = [];
-    let directoryHandle = null; // To store the selected directory handle
+    onInit() {
+        if (!this.isValid) return;
+        // console.log(`${this.appConfig.name} initialized.`);
+        // Initial message if no folder loaded yet
+        if (this.thumbnailStrip && this.imageFiles.length === 0) {
+            this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
+        }
+    }
+    
+    async onOpen() {
+        if (!this.isValid) return;
+        // console.log(`${this.appConfig.name} opened.`);
+        // Try to load last folder only if no images are currently loaded (e.g., first open or after close)
+        if (this.imageFiles.length === 0) { 
+            await this._tryLoadLastFolder();
+        }
+    }
 
-    // IndexedDB Helper Functions (same as before)
-    const DB_NAME = 'WebDesktopAppSettings';
-    const DB_VERSION = 1;
-    const STORE_NAME = 'mediaViewerSettings';
-    const DIR_HANDLE_KEY = 'lastDirectoryHandle';
+    onClose() {
+        // Called by AppBase's close method
+        if (!this.isValid) return;
+        // Revoke object URLs
+        Array.from(this.thumbnailStrip.children).forEach(child => {
+            if (child.tagName === 'IMG' && child.src.startsWith('blob:')) URL.revokeObjectURL(child.src);
+        });
+        if (this.mainImage.src.startsWith('blob:')) URL.revokeObjectURL(this.mainImage.src);
+        
+        this.imageFiles = [];
+        // directoryHandle is persisted, so we don't clear it here.
+        // It will be re-verified on next open.
+        if (this.thumbnailStrip) this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
+        if (this.mainImage) {
+            this.mainImage.src = '';
+            this.mainImage.alt = 'Selected Media';
+        }
+        // console.log(`${this.appConfig.name} closed, view cleared.`);
+    }
 
-    function openDB() {
+    _bindMediaViewerEventListeners() {
+        if (!this.isValid || !this.selectFolderButton) return;
+        this.selectFolderButton.addEventListener('click', () => this._handleFolderSelection());
+    }
+
+    // --- IndexedDB Methods ---
+    _openDB() {
         return new Promise((resolve, reject) => {
-            const request = indexedDB.open(DB_NAME, DB_VERSION);
-            request.onerror = (event) => reject("Error opening DB: " + event.target.errorCode);
+            const request = indexedDB.open(this.DB_NAME, this.DB_VERSION);
+            request.onerror = (event) => reject("DB Error: " + event.target.errorCode);
             request.onsuccess = (event) => resolve(event.target.result);
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME);
+                if (!db.objectStoreNames.contains(this.STORE_NAME)) {
+                    db.createObjectStore(this.STORE_NAME);
                 }
             };
         });
     }
-
-    async function getSetting(key) {
-        const db = await openDB();
+    async _getSetting(key) {
+        const db = await this._openDB();
         return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readonly');
-            const store = transaction.objectStore(STORE_NAME);
+            const transaction = db.transaction([this.STORE_NAME], 'readonly');
+            const store = transaction.objectStore(this.STORE_NAME);
             const request = store.get(key);
-            request.onerror = (event) => reject("Error getting setting: " + event.target.errorCode);
+            request.onerror = (event) => reject("DB Get Error: " + event.target.errorCode);
             request.onsuccess = (event) => resolve(event.target.result);
         });
     }
-
-    async function setSetting(key, value) {
-        const db = await openDB();
+    async _setSetting(key, value) {
+        const db = await this._openDB();
         return new Promise((resolve, reject) => {
-            const transaction = db.transaction([STORE_NAME], 'readwrite');
-            const store = transaction.objectStore(STORE_NAME);
+            const transaction = db.transaction([this.STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(this.STORE_NAME);
             const request = store.put(value, key);
-            request.onerror = (event) => reject("Error setting setting: " + event.target.errorCode);
+            request.onerror = (event) => reject("DB Set Error: " + event.target.errorCode);
             request.onsuccess = (event) => resolve(event.target.result);
         });
     }
-    // --- End IndexedDB Helpers ---
 
-    let originalDimensions = {
-        width: appWindowElement.style.width,
-        height: appWindowElement.style.height,
-        top: appWindowElement.style.top,
-        left: appWindowElement.style.left
-    };
-    let isMaximized = false;
-
-    async function loadFilesFromHandle(handle) {
-        imageFiles = [];
-        thumbnailStrip.innerHTML = '';
-        mainImage.src = '';
-        mainImage.alt = 'Loading images...';
+    // --- File System Access Logic ---
+    async _loadFilesFromHandle(handle) {
+        this.imageFiles = [];
+        this.thumbnailStrip.innerHTML = '';
+        this.mainImage.src = '';
+        this.mainImage.alt = 'Loading images...';
         let foundImages = false;
         try {
             for await (const entry of handle.values()) {
                 if (entry.kind === 'file' && (entry.name.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i))) {
                     const file = await entry.getFile();
-                    imageFiles.push(file);
+                    this.imageFiles.push(file);
                     foundImages = true;
                 }
             }
             if (foundImages) {
-                populateThumbnails();
-                if (imageFiles.length > 0) displayImage(0);
+                this._populateThumbnails();
+                if (this.imageFiles.length > 0) this._displayImage(0);
             } else {
-                thumbnailStrip.innerHTML = '<p class="media-viewer-message">No supported image files found in the folder.</p>';
-                mainImage.alt = 'No images found';
+                this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">No supported image files found.</p>';
+                this.mainImage.alt = 'No images';
             }
         } catch (err) {
-            console.error("Error reading files from directory handle:", err);
-            thumbnailStrip.innerHTML = `<p class="media-viewer-message">Error reading folder: ${err.message}</p>`;
-            mainImage.alt = 'Error loading images';
-            directoryHandle = null; 
-            await setSetting(DIR_HANDLE_KEY, null).catch(e => console.error("Error clearing handle", e));
+            console.error("Error reading files from handle:", err);
+            this.thumbnailStrip.innerHTML = `<p class="media-viewer-message">Error: ${err.message}</p>`;
+            this.mainImage.alt = 'Error loading';
+            this.directoryHandle = null;
+            await this._setSetting(this.DIR_HANDLE_KEY, null).catch(e => console.error("Error clearing handle", e));
         }
     }
-    
-    async function verifyAndRequestPermission(handle) {
-        const options = { mode: 'read' };
-        if (await handle.queryPermission(options) === 'granted') return true;
-        if (await handle.requestPermission(options) === 'granted') return true;
-        return false;
+    async _verifyAndRequestPermission(handle) {
+        if (await handle.queryPermission({ mode: 'read' }) === 'granted') return true;
+        return await handle.requestPermission({ mode: 'read' }) === 'granted';
     }
-
-    async function handleFolderSelection() {
+    async _handleFolderSelection() {
         try {
             const handle = await window.showDirectoryPicker();
             if (handle) {
-                directoryHandle = handle;
-                await setSetting(DIR_HANDLE_KEY, directoryHandle);
-                await loadFilesFromHandle(directoryHandle);
+                this.directoryHandle = handle;
+                await this._setSetting(this.DIR_HANDLE_KEY, this.directoryHandle);
+                await this._loadFilesFromHandle(this.directoryHandle);
             }
         } catch (err) {
-            if (err.name !== 'AbortError') {
-                console.error("Error selecting folder:", err);
-                thumbnailStrip.innerHTML = `<p class="media-viewer-message">Error selecting folder: ${err.message}</p>`;
-            } else {
-                 thumbnailStrip.innerHTML = '<p class="media-viewer-message">Folder selection cancelled.</p>';
-            }
+            if (err.name !== 'AbortError') console.error("Folder selection error:", err);
+            else this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">Folder selection cancelled.</p>';
         }
     }
-
-    function populateThumbnails() {
-        thumbnailStrip.innerHTML = '';
-        imageFiles.forEach((file, index) => {
+    _populateThumbnails() {
+        this.thumbnailStrip.innerHTML = '';
+        this.imageFiles.forEach((file, index) => {
             const thumbImg = document.createElement('img');
             thumbImg.src = URL.createObjectURL(file);
             thumbImg.alt = file.name;
             thumbImg.title = file.name;
             thumbImg.dataset.index = index;
-            thumbImg.addEventListener('click', () => displayImage(index));
-            thumbnailStrip.appendChild(thumbImg);
+            thumbImg.addEventListener('click', () => this._displayImage(index));
+            this.thumbnailStrip.appendChild(thumbImg);
         });
     }
-
-    function displayImage(index) {
-        if (index >= 0 && index < imageFiles.length) {
-            const file = imageFiles[index];
-            if (mainImage.src.startsWith('blob:')) URL.revokeObjectURL(mainImage.src); // Revoke previous if any
-            mainImage.src = URL.createObjectURL(file);
-            mainImage.alt = file.name;
-            updateActiveThumbnail(thumbnailStrip.children[index]);
+    _displayImage(index) {
+        if (index >= 0 && index < this.imageFiles.length) {
+            const file = this.imageFiles[index];
+            if (this.mainImage.src.startsWith('blob:')) URL.revokeObjectURL(this.mainImage.src);
+            this.mainImage.src = URL.createObjectURL(file);
+            this.mainImage.alt = file.name;
+            this._updateActiveThumbnail(this.thumbnailStrip.children[index]);
         }
     }
-
-    function updateActiveThumbnail(activeThumbElement) {
-        Array.from(thumbnailStrip.children).forEach(child => {
+    _updateActiveThumbnail(activeThumbElement) {
+        Array.from(this.thumbnailStrip.children).forEach(child => {
             if (child.tagName === 'IMG') child.classList.remove('active-thumbnail');
         });
         if (activeThumbElement && activeThumbElement.tagName === 'IMG') {
             activeThumbElement.classList.add('active-thumbnail');
         }
     }
-    
-    selectFolderButton.addEventListener('click', handleFolderSelection);
-
-    async function tryLoadLastFolder() {
+    async _tryLoadLastFolder() {
         try {
-            const handle = await getSetting(DIR_HANDLE_KEY);
+            const handle = await this._getSetting(this.DIR_HANDLE_KEY);
             if (handle) {
-                if (await verifyAndRequestPermission(handle)) {
-                    directoryHandle = handle; // Keep the handle
-                    await loadFilesFromHandle(directoryHandle);
+                if (await this._verifyAndRequestPermission(handle)) {
+                    this.directoryHandle = handle;
+                    await this._loadFilesFromHandle(this.directoryHandle);
                 } else {
-                    thumbnailStrip.innerHTML = '<p class="media-viewer-message">Permission denied for the last folder. Please select a folder.</p>';
-                    directoryHandle = null; 
-                    await setSetting(DIR_HANDLE_KEY, null);
+                    this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">Permission denied for last folder.</p>';
+                    this.directoryHandle = null;
+                    await this._setSetting(this.DIR_HANDLE_KEY, null);
                 }
             } else {
-                 thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
+                this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
             }
         } catch (err) {
-            console.error("Error trying to load last folder:", err);
-            thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
+            console.error("Error loading last folder:", err);
+            this.thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
         }
-    }
-
-    appIcon.addEventListener('click', async () => {
-        appWindowElement.style.display = 'flex';
-        if (!taskbarButton && window.manageTaskbar) {
-            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
-        }
-        if (window.manageTaskbar) window.manageTaskbar.bringToFront(appWindowElement.id);
-
-        if (!isMaximized) {
-            appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
-            appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
-             if (!originalDimensions.left || originalDimensions.left === "50%") {
-                 appWindowElement.style.left = '50%';
-                 appWindowElement.style.top = '50%';
-                 appWindowElement.style.transform = 'translate(-50%, -50%)';
-            } else {
-                 appWindowElement.style.left = originalDimensions.left;
-                 appWindowElement.style.top = originalDimensions.top;
-                 appWindowElement.style.transform = 'none';
-            }
-        }
-        
-        if (imageFiles.length === 0) { // Try to load last folder only if no images are currently loaded
-            await tryLoadLastFolder();
-        }
-    });
-
-    appWindowElement.addEventListener('mousedown', () => {
-        if (window.manageTaskbar) {
-            window.manageTaskbar.bringToFront(appWindowElement.id);
-        }
-    }, true);
-
-    closeButton.addEventListener('click', () => {
-        appWindowElement.style.display = 'none';
-        // Revoke object URLs
-        Array.from(thumbnailStrip.children).forEach(child => {
-            if (child.tagName === 'IMG' && child.src.startsWith('blob:')) URL.revokeObjectURL(child.src);
-        });
-        if (mainImage.src.startsWith('blob:')) URL.revokeObjectURL(mainImage.src);
-        
-        // Clear current state for next "fresh" open, but keep directoryHandle from DB
-        imageFiles = [];
-        thumbnailStrip.innerHTML = '<p class="media-viewer-message">Select a folder to view images.</p>';
-        mainImage.src = '';
-        mainImage.alt = 'Selected Media';
-        
-        if (window.manageTaskbar) {
-            window.manageTaskbar.remove(appWindowElement.id);
-        }
-        taskbarButton = null;
-        isMaximized = false;
-        originalDimensions = {
-            width: appConfig.defaultWidth,
-            height: appConfig.defaultHeight,
-            top: '50%',
-            left: '50%'
-        };
-    });
-
-    if (appConfig.minimizable && minimizeButton) {
-        minimizeButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            appWindowElement.style.display = 'none';
-            if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
-        });
-    }
-
-    if (appConfig.maximizable && windowHeader) {
-        windowHeader.addEventListener('dblclick', (e) => {
-            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
-            if (isMaximized) {
-                appWindowElement.classList.remove('maximized');
-                appWindowElement.style.width = originalDimensions.width;
-                appWindowElement.style.height = originalDimensions.height;
-                appWindowElement.style.top = originalDimensions.top;
-                appWindowElement.style.left = originalDimensions.left;
-                if (originalDimensions.left === '50%') {
-                    appWindowElement.style.transform = 'translate(-50%, -50%)';
-                } else {
-                    appWindowElement.style.transform = 'none';
-                }
-                isMaximized = false;
-            } else {
-                originalDimensions = {
-                    width: appWindowElement.style.width,
-                    height: appWindowElement.style.height,
-                    top: appWindowElement.style.top,
-                    left: appWindowElement.style.left
-                };
-                appWindowElement.classList.add('maximized');
-                appWindowElement.style.transform = 'none';
-                isMaximized = true;
-            }
-        });
-    }
-
-    if (windowHeader) {
-        let isDragging = false;
-        let dragOffsetX, dragOffsetY;
-        windowHeader.addEventListener('mousedown', (e) => {
-            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
-            isDragging = true;
-            if (appWindowElement.style.transform.includes('translate')) {
-                const rect = appWindowElement.getBoundingClientRect();
-                const parentRect = appWindowElement.parentElement.getBoundingClientRect();
-                appWindowElement.style.left = `${rect.left - parentRect.left}px`;
-                appWindowElement.style.top = `${rect.top - parentRect.top}px`;
-                appWindowElement.style.transform = 'none';
-            }
-            dragOffsetX = e.clientX - appWindowElement.offsetLeft;
-            dragOffsetY = e.clientY - appWindowElement.offsetTop;
-            appWindowElement.style.cursor = 'grabbing';
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            let newX = e.clientX - dragOffsetX;
-            let newY = e.clientY - dragOffsetY;
-            const desktop = document.getElementById('desktop');
-            const maxX = desktop.offsetWidth - appWindowElement.offsetWidth;
-            const maxY = desktop.offsetHeight - appWindowElement.offsetHeight;
-            newX = Math.max(0, Math.min(newX, maxX));
-            newY = Math.max(0, Math.min(newY, maxY));
-            appWindowElement.style.left = `${newX}px`;
-            appWindowElement.style.top = `${newY}px`;
-        });
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                appWindowElement.style.cursor = 'move';
-                originalDimensions.left = appWindowElement.style.left;
-                originalDimensions.top = appWindowElement.style.top;
-            }
-        });
-    }
-
-    if (appConfig.resizable && resizeHandle) {
-        let isResizing = false;
-        let resizeInitialX, resizeInitialY, initialWidth, initialHeight;
-        resizeHandle.addEventListener('mousedown', (e) => {
-            if (isMaximized) return;
-            e.stopPropagation();
-            isResizing = true;
-            resizeInitialX = e.clientX;
-            resizeInitialY = e.clientY;
-            initialWidth = appWindowElement.offsetWidth;
-            initialHeight = appWindowElement.offsetHeight;
-            appWindowElement.style.transform = 'none';
-            if (appWindowElement.style.left === '50%') {
-                appWindowElement.style.left = `${appWindowElement.offsetLeft}px`;
-                appWindowElement.style.top = `${appWindowElement.offsetTop}px`;
-            }
-            document.body.style.cursor = 'nwse-resize';
-            appWindowElement.style.userSelect = 'none';
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            const dx = e.clientX - resizeInitialX;
-            const dy = e.clientY - resizeInitialY;
-            let newWidth = initialWidth + dx;
-            let newHeight = initialHeight + dy;
-            const minWidth = parseInt(getComputedStyle(appWindowElement).minWidth, 10) || 150;
-            const minHeight = parseInt(getComputedStyle(appWindowElement).minHeight, 10) || 100;
-            newWidth = Math.max(minWidth, newWidth);
-            newHeight = Math.max(minHeight, newHeight);
-            appWindowElement.style.width = `${newWidth}px`;
-            appWindowElement.style.height = `${newHeight}px`;
-        });
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                document.body.style.cursor = 'default';
-                appWindowElement.style.userSelect = '';
-                originalDimensions.width = appWindowElement.style.width;
-                originalDimensions.height = appWindowElement.style.height;
-            }
-        });
     }
 }
+
+// Explicitly assign the class to the window object
+window.MediaViewerApp = MediaViewerApp;

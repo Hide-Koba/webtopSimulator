@@ -54,95 +54,82 @@ Webデスクトップは以下のように構成されています。
 ```
 
 ### ステップ 2.4: アプリケーションJavaScriptの作成 (`myApp.js`)
-`apps/MyApp/` 内に `myApp.js` を作成します。
-初期化関数は `appConfig` と `appWindowElement` を引数に取ります。
-このスクリプトで、アイコンクリック時のウィンドウ表示、閉じるボタン、最小化ボタンのイベントリスナー、ドラッグ、リサイズ、最大化のロジックを実装します。タスクバーとの連携、ウィンドウの前面表示もここで行います。
+`apps/MyApp/` 内に `myApp.js` を作成します。このファイルは `AppBase` を拡張するクラスを定義する必要があります。
+`config.json` の `initFunction` プロパティには、このクラスの名前を設定します。
 
 例 (`apps/MyApp/myApp.js`):
 ```javascript
-function initializeMyApp(appConfig, appWindowElement) {
-    const appIcon = document.getElementById('my-app-icon'); // アイコンIDを確認
-
-    if (!appIcon || !appWindowElement) {
-        console.warn(`'${appConfig.name}' の要素が見つかりません。`);
-        return;
+class MyApp extends AppBase {
+    constructor(appConfig, appWindowElement) {
+        super(appConfig, appWindowElement); // AppBaseコンストラクタを呼び出す
+        // AppBaseコンストラクタの最後に this.onInit() が呼び出されます。
     }
 
-    const closeButton = appWindowElement.querySelector('.close-button');
-    const minimizeButton = appWindowElement.querySelector('.minimize-button'); // script.jsが追加
-    const windowHeader = appWindowElement.querySelector('.window-header');
-    const resizeHandle = appWindowElement.querySelector('.window-resize-handle'); // script.jsが追加
-    let taskbarButton = null;
-
-    let originalDimensions = { /* 最大化からの復元用 */
-        width: appWindowElement.style.width, height: appWindowElement.style.height,
-        top: appWindowElement.style.top, left: appWindowElement.style.left
-    };
-    let isMaximized = false;
-
-    // ウィンドウを開く/タスクバーから復元
-    appIcon.addEventListener('click', () => {
-        appWindowElement.style.display = 'flex';
-        if (!taskbarButton && window.manageTaskbar) { // 初回オープン時にタスクバーボタン作成
-            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
-        }
-        // ウィンドウのmousedownリスナーが前面表示を処理しますが、明示的なオープン/復元時にも行うと良いでしょう
-        if (window.manageTaskbar) window.manageTaskbar.bringToFront(appWindowElement.id);
-
-
-        if (!isMaximized) { /* サイズと位置を復元/設定 */ }
-    });
-    
-    // ウィンドウにmousedownリスナーを追加して前面に表示
-    appWindowElement.addEventListener('mousedown', () => {
-        if (window.manageTaskbar) {
-            window.manageTaskbar.bringToFront(appWindowElement.id);
-        }
-    }, true); // キャプチャフェーズを使用
-
-    // 閉じるボタン
-    closeButton.addEventListener('click', () => {
-        appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id);
-        taskbarButton = null;
-    });
-
-    // 最小化ボタン (appConfig.minimizable が true の場合)
-    if (appConfig.minimizable && minimizeButton) {
-        minimizeButton.addEventListener('click', () => {
-            appWindowElement.style.display = 'none';
-            if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
-        });
+    onInit() {
+        // AppBaseコンストラクタによって呼び出されます。
+        // MyApp固有の初期化処理をここに追加します。
+        // 例: このアプリのウィンドウ内の特定のUI要素への参照を取得
+        // this.myButton = this.appWindowElement.querySelector('.my-app-button');
+        // if (this.myButton) {
+        //     this.myButton.addEventListener('click', () => this.doSomething());
+        // }
+        if (!this.isValid) return; // AppBaseのセットアップが失敗したか確認
+        console.log(`${this.appConfig.name} がAppBaseを使用して初期化されました。`);
     }
 
-    // 最大化/復元 (appConfig.maximizable が true の場合)
-    if (appConfig.maximizable && windowHeader) {
-        windowHeader.addEventListener('dblclick', (e) => { /* ...最大化/復元ロジック... */ });
+    onOpen() {
+        // ウィンドウが開かれた/タスクバーから復元されたときにAppBaseによって呼び出されます。
+        // ウィンドウが表示されたときのアプリ固有のロジックを追加します。
+        if (!this.isValid) return;
+        console.log(`${this.appConfig.name} が開かれました。`);
     }
 
-    // ドラッグ処理 (windowHeader)
-    if (windowHeader) { 
-        // ...ドラッグロジック... 
-        // mousedown内で: 前面表示はウィンドウのmousedownリスナーが処理
+    onClose() {
+        // ウィンドウが閉じられたとき(Xボタン)にAppBaseによって呼び出されます。
+        // 次回の「新規」オープンに備えて、アプリ固有の状態をここでリセットします。
+        if (!this.isValid) return;
+        console.log(`${this.appConfig.name} が閉じられ、固有の状態がリセットされました。`);
+        // 例: if (this.myTextarea) this.myTextarea.value = '';
     }
 
-    // リサイズ処理 (appConfig.resizable と resizeHandle が存在する場合)
-    if (appConfig.resizable && resizeHandle) { /* ...リサイズロジック... */ }
+    // 他のAppBaseライフサイクルメソッドも必要に応じてオーバーライドできます:
+    // onMinimize() { ... }
+    // onToggleMaximize(isNowMaximized) { ... }
+
+    // アプリ固有のメソッドを追加:
+    // doSomething() {
+    //    console.log(`${this.appConfig.name} が何かを実行しています！`);
+    // }
 }
+
+// クラスをグローバルに利用可能にし、script.jsがインスタンス化できるようにします。
+// 通常、スクリプトのトップレベルで定義されたクラスでは自動的にそうなります。
+// モジュールやバンドラを使用している場合は、window.MyApp = MyApp; が必要になることがあります。
 ```
-*(完全なドラッグ、リサイズ、最大化のロジックは既存のアプリのJSファイルを参照してください。)*
+`AppBase` クラスは、オープン、クローズ、最小化、最大化、ドラッグ、リサイズ、基本的なタスクバー操作といった共通機能を処理します。アプリ固有のクラスは、その独自の機能に集中し、これらのライフサイクルイベントに対してカスタム動作が必要な場合に `AppBase` のメソッドをオーバーライドできます。
 
 ## 3. `config.json` の更新
-`apps` 配列に新しいエントリを追加します。ウィンドウ動作プロパティも忘れずに。
-- `defaultWidth`, `defaultHeight` (文字列, 例: "400px")
-- `resizable`, `maximizable`, `minimizable` (ブール値)
+アプリケーションの新しいエントリを追加します。`initFunction` は、**アプリのクラス名**にする必要があります。
+また、アイコンのHTML IDが規約 (`appName.toLowerCase() + '-app-icon'`) に従わない場合は、`iconId` プロパティを含めます。
 
-例:
+「MyApp」のエントリ例:
 ```json
 {
   "name": "MyApp",
+  "iconId": "my-app-icon", // icon.html 内のアイコンの特定のID
   "script": "apps/MyApp/myApp.js",
-  "initFunction": "initializeMyApp",
+  "initFunction": "MyApp", // これはクラス名と一致する必要があります
+  "iconHtml": "apps/MyApp/icon.html",
+  "bodyHtml": "apps/MyApp/appbody.html",
+  "css": "apps/MyApp/style.css",
+  "defaultWidth": "400px",
+  "defaultHeight": "300px",
+  "resizable": true,
+  "maximizable": true,
+  "minimizable": true
+}
+```
+この新しいオブジェクトが `apps` 配列の要素として追加され、正しいJSON構文が維持されていることを確認してください。
   "iconHtml": "apps/MyApp/icon.html",
   "bodyHtml": "apps/MyApp/appbody.html",
   "css": "apps/MyApp/style.css",

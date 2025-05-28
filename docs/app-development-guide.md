@@ -60,219 +60,82 @@ Example (`apps/MyApp/appbody.html`):
 ```
 
 ### Step 2.4: Create Application JavaScript (`myApp.js`)
-Inside `apps/MyApp/`, create `myApp.js`. This file contains your application's logic.
-It **must** define an initialization function (e.g., `initializeMyApp`). This function will receive two arguments from `script.js`:
-1.  `appConfig`: The application's configuration object from `config.json`.
-2.  `appWindowElement`: The DOM element for the application's main window.
-
-Key tasks for this script:
-- Get references to the icon (e.g., `document.getElementById('my-app-icon')`).
-- Use `appWindowElement` to find elements within the window (e.g., close button, header, resize handle).
-- Implement open/close logic.
-- Implement draggable, resizable, and maximizable behaviors based on `appConfig.resizable` and `appConfig.maximizable`.
+Inside `apps/MyApp/`, create `myApp.js`. This file should define a class that extends `AppBase`.
+The `initFunction` property in `config.json` should be set to the name of this class.
 
 Example (`apps/MyApp/myApp.js`):
 ```javascript
-function initializeMyApp(appConfig, appWindowElement) {
-    // appConfig: { name, script, ..., defaultWidth, defaultHeight, resizable, maximizable }
-    // appWindowElement: The main DOM element for this app's window
-
-    const appIcon = document.getElementById('my-app-icon'); // Make sure this ID matches your icon.html
-
-    if (!appIcon || !appWindowElement) {
-        console.warn(`'${appConfig.name}' elements not found. Icon: ${appIcon}, Window: ${appWindowElement}`);
-        return;
+class MyApp extends AppBase {
+    constructor(appConfig, appWindowElement) {
+        super(appConfig, appWindowElement); // Call the AppBase constructor
+        // AppBase constructor calls this.onInit() at the end.
     }
 
-    const closeButton = appWindowElement.querySelector('.close-button');
-    // Minimize button is added by script.js if appConfig.minimizable is true
-    const minimizeButton = appWindowElement.querySelector('.minimize-button'); 
-    const windowHeader = appWindowElement.querySelector('.window-header');
-    // Resize handle is added by script.js if appConfig.resizable is true
-    const resizeHandle = appWindowElement.querySelector('.window-resize-handle'); 
-    let taskbarButton = null; // To store reference to this app's taskbar button
-
-    let originalDimensions = { /* Store for restore from maximize */
-        width: appWindowElement.style.width, height: appWindowElement.style.height,
-        top: appWindowElement.style.top, left: appWindowElement.style.left
-    };
-    let isMaximized = false;
-
-    // Open window
-    appIcon.addEventListener('click', () => {
-        appWindowElement.style.display = 'flex';
-        // Create or get taskbar button and set as active
-        if (!taskbarButton && window.manageTaskbar) {
-            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
-        }
-        if (window.manageTaskbar) {
-            window.manageTaskbar.setActive(appWindowElement.id);
-        }
-
-        if (!isMaximized) {
-            // Apply default or stored dimensions/position
-            appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
-            appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
-            if (!originalDimensions.left || originalDimensions.left === "50%") {
-                 appWindowElement.style.left = '50%'; appWindowElement.style.top = '50%';
-                 appWindowElement.style.transform = 'translate(-50%, -50%)';
-            } else {
-                 appWindowElement.style.left = originalDimensions.left; appWindowElement.style.top = originalDimensions.top;
-                 appWindowElement.style.transform = 'none';
-            }
-        }
-        // Bring to front is handled by the window's mousedown listener, but also good to do on explicit open/restore
-        if (window.manageTaskbar) window.manageTaskbar.bringToFront(appWindowElement.id);
-    });
-
-    // Add mousedown listener to the window to bring it to front
-    appWindowElement.addEventListener('mousedown', () => {
-        if (window.manageTaskbar) {
-            window.manageTaskbar.bringToFront(appWindowElement.id);
-        }
-    }, true); // Use capture phase
-
-    // Close window
-    closeButton.addEventListener('click', () => {
-        appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) {
-            window.manageTaskbar.remove(appWindowElement.id); // Remove from taskbar
-        }
-        taskbarButton = null; // Reset reference
-    });
-
-    // Minimize window
-    if (appConfig.minimizable && minimizeButton) {
-        minimizeButton.addEventListener('click', () => {
-            appWindowElement.style.display = 'none';
-            if (window.manageTaskbar) {
-                window.manageTaskbar.setInactive(appWindowElement.id);
-            }
-            // The taskbar button itself (created in script.js) will handle restoring the window.
-        });
+    onInit() {
+        // This is called by the AppBase constructor.
+        // Add any MyApp-specific initialization here.
+        // For example, getting references to specific UI elements within this app's window:
+        // this.myButton = this.appWindowElement.querySelector('.my-app-button');
+        // if (this.myButton) {
+        //     this.myButton.addEventListener('click', () => this.doSomething());
+        // }
+        if (!this.isValid) return; // Check if AppBase setup failed
+        console.log(`${this.appConfig.name} initialized using AppBase.`);
     }
 
-    // Maximize/Restore on header double-click
-    if (appConfig.maximizable && windowHeader) {
-        windowHeader.addEventListener('dblclick', (e) => {
-            // Avoid triggering on buttons within header
-            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
-
-            if (isMaximized) { // Restore
-                appWindowElement.classList.remove('maximized');
-                appWindowElement.style.width = originalDimensions.width;
-                appWindowElement.style.height = originalDimensions.height;
-                appWindowElement.style.top = originalDimensions.top;
-                appWindowElement.style.left = originalDimensions.left;
-                appWindowElement.style.transform = (originalDimensions.left === '50%') ? 'translate(-50%, -50%)' : 'none';
-                isMaximized = false;
-            } else { // Maximize
-                originalDimensions = { /* Save current state */
-                    width: appWindowElement.style.width, height: appWindowElement.style.height,
-                    top: appWindowElement.style.top, left: appWindowElement.style.left
-                };
-                appWindowElement.classList.add('maximized');
-                appWindowElement.style.transform = 'none'; // Remove any transform
-                isMaximized = true;
-            }
-        });
+    onOpen() {
+        // Called by AppBase when the window is opened/restored.
+        // Add app-specific logic for when the window becomes visible.
+        if (!this.isValid) return;
+        console.log(`${this.appConfig.name} opened.`);
     }
 
-    // Draggable window
-    if (windowHeader) {
-        let isDragging = false, dragOffsetX, dragOffsetY;
-        windowHeader.addEventListener('mousedown', (e) => {
-            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
-            isDragging = true;
-            appWindowElement.style.transform = 'none'; // Crucial for correct offset calculation
-            dragOffsetX = e.clientX - appWindowElement.offsetLeft;
-            dragOffsetY = e.clientY - appWindowElement.offsetTop;
-            appWindowElement.style.cursor = 'grabbing';
-            // Bring to front is handled by the window's mousedown listener
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            let newX = e.clientX - dragOffsetX;
-            let newY = e.clientY - dragOffsetY;
-            const desktop = document.getElementById('desktop');
-            // Basic boundary collision
-            newX = Math.max(0, Math.min(newX, desktop.offsetWidth - appWindowElement.offsetWidth));
-            newY = Math.max(0, Math.min(newY, desktop.offsetHeight - appWindowElement.offsetHeight));
-            appWindowElement.style.left = `${newX}px`;
-            appWindowElement.style.top = `${newY}px`;
-        });
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                appWindowElement.style.cursor = 'move';
-                // Store new position for restore if not maximized
-                if(!isMaximized) {
-                    originalDimensions.left = appWindowElement.style.left;
-                    originalDimensions.top = appWindowElement.style.top;
-                }
-            }
-        });
+    onClose() {
+        // Called by AppBase when the window is closed (X button).
+        // Reset any app-specific state here to ensure a "fresh" open next time.
+        if (!this.isValid) return;
+        console.log(`${this.appConfig.name} closed, specific state reset.`);
+        // Example: if (this.myTextarea) this.myTextarea.value = '';
     }
 
-    // Resizable window (if enabled and handle exists)
-    if (appConfig.resizable && resizeHandle) {
-        let isResizing = false, resizeInitialX, resizeInitialY, initialWidth, initialHeight;
-        resizeHandle.addEventListener('mousedown', (e) => {
-            if (isMaximized) return;
-            e.stopPropagation(); // Prevent drag
-            isResizing = true;
-            resizeInitialX = e.clientX; resizeInitialY = e.clientY;
-            initialWidth = appWindowElement.offsetWidth; initialHeight = appWindowElement.offsetHeight;
-            appWindowElement.style.transform = 'none'; // Ensure direct sizing
-            // Convert 50%/50% to pixel values if needed
-            if (appWindowElement.style.left === '50%') {
-                appWindowElement.style.left = `${appWindowElement.offsetLeft}px`;
-                appWindowElement.style.top = `${appWindowElement.offsetTop}px`;
-            }
-            document.body.style.cursor = 'nwse-resize';
-            appWindowElement.style.userSelect = 'none'; // Prevent text selection during resize
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            const dx = e.clientX - resizeInitialX; const dy = e.clientY - resizeInitialY;
-            let newWidth = initialWidth + dx; let newHeight = initialHeight + dy;
-            const minWidth = parseInt(getComputedStyle(appWindowElement).minWidth, 10) || 150;
-            const minHeight = parseInt(getComputedStyle(appWindowElement).minHeight, 10) || 100;
-            newWidth = Math.max(minWidth, newWidth); newHeight = Math.max(minHeight, newHeight);
-            appWindowElement.style.width = `${newWidth}px`;
-            appWindowElement.style.height = `${newHeight}px`;
-        });
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                document.body.style.cursor = 'default';
-                appWindowElement.style.userSelect = '';
-                 // Store new dimensions for restore if not maximized
-                if(!isMaximized) {
-                    originalDimensions.width = appWindowElement.style.width;
-                    originalDimensions.height = appWindowElement.style.height;
-                }
-            }
-        });
-    }
+    // You can override other AppBase lifecycle methods:
+    // onMinimize() { ... }
+    // onToggleMaximize(isNowMaximized) { ... }
+
+    // Add app-specific methods:
+    // doSomething() {
+    //    console.log(`${this.appConfig.name} is doing something!`);
+    // }
 }
+
+// Ensure the class is available globally for script.js to instantiate
+// This is typically automatic for classes defined at the top level of a script.
+// If using modules or bundlers, you might need: window.MyApp = MyApp;
 ```
-*(Note: The z-index management for bringing windows to the front is a common enhancement and should be implemented for better UX with multiple windows. This example focuses on the resize/maximize logic.)*
+The `AppBase` class handles common functionalities like opening, closing, minimizing, maximizing, dragging, resizing, and basic taskbar interaction. Your app-specific class can focus on its unique features and override `AppBase` methods if custom behavior is needed for those lifecycle events.
 
 ## 3. Update `config.json`
-Add a new entry for your application in the `apps` array within `config.json`. Include the new window behavior properties:
-- `defaultWidth` (string, e.g., "400px")
-- `defaultHeight` (string, e.g., "300px")
-- `resizable` (boolean, `true` or `false`)
-- `maximizable` (boolean, `true` or `false`)
-- `minimizable` (boolean, `true` or `false`)
+Add a new entry for your application. The `initFunction` should now be the **name of your app's class**.
+Also, include an `iconId` property if your icon's HTML ID doesn't follow the convention `appName.toLowerCase() + '-app-icon'`.
 
 Example entry for "MyApp":
 ```json
 {
   "name": "MyApp",
+  "iconId": "my-app-icon", // Specific ID of the icon in icon.html
   "script": "apps/MyApp/myApp.js",
-  "initFunction": "initializeMyApp",
+  "initFunction": "MyApp", // This must match the class name
+  "iconHtml": "apps/MyApp/icon.html",
+  "bodyHtml": "apps/MyApp/appbody.html",
+  "css": "apps/MyApp/style.css",
+  "defaultWidth": "400px",
+  "defaultHeight": "300px",
+  "resizable": true,
+  "maximizable": true,
+  "minimizable": true
+}
+```
+Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax.
   "iconHtml": "apps/MyApp/icon.html",
   "bodyHtml": "apps/MyApp/appbody.html",
   "css": "apps/MyApp/style.css",

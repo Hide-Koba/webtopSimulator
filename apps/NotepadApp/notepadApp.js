@@ -1,196 +1,41 @@
-function initializeNotepadApp(appConfig, appWindowElement) {
-    const appIcon = document.getElementById('notepad-app-icon');
-    
-    if (!appIcon || !appWindowElement) {
-        console.warn(`${appConfig.name || 'App'} elements not found. App will not initialize.`);
-        return;
+class NotepadApp extends AppBase {
+    constructor(appConfig, appWindowElement) {
+        super(appConfig, appWindowElement);
+        // Specific NotepadApp properties can be initialized here
+        if (this.isValid) {
+            this.notepadTextarea = this.appWindowElement.querySelector('.notepad-textarea');
+        }
     }
 
-    const closeButton = appWindowElement.querySelector('.close-button');
-    const minimizeButton = appWindowElement.querySelector('.minimize-button');
-    const windowHeader = appWindowElement.querySelector('.window-header');
-    const resizeHandle = appWindowElement.querySelector('.window-resize-handle');
-    let taskbarButton = null;
+    onInit() {
+        // Called by AppBase constructor
+        if (!this.isValid) return;
+        // console.log(`${this.appConfig.name} initialized.`);
+        // Any other specific init logic for Notepad
+    }
 
-    let originalDimensions = {
-        width: appWindowElement.style.width,
-        height: appWindowElement.style.height,
-        top: appWindowElement.style.top,
-        left: appWindowElement.style.left
-    };
-    let isMaximized = false;
+    onOpen() {
+        if (!this.isValid) return;
+        // console.log(`${this.appConfig.name} opened.`);
+        // If you want to focus the textarea when the app opens:
+        // if (this.notepadTextarea) {
+        //     this.notepadTextarea.focus();
+        // }
+    }
 
-    appIcon.addEventListener('click', () => {
-        appWindowElement.style.display = 'flex';
-        if (!taskbarButton && window.manageTaskbar) {
-            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
-        }
-        if (window.manageTaskbar) window.manageTaskbar.setActive(appWindowElement.id);
-
-        if (!isMaximized) {
-            appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
-            appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
-            if (!originalDimensions.left || originalDimensions.left === "50%") {
-                 appWindowElement.style.left = '50%';
-                 appWindowElement.style.top = '50%';
-                 appWindowElement.style.transform = 'translate(-50%, -50%)';
-            } else {
-                 appWindowElement.style.left = originalDimensions.left;
-                 appWindowElement.style.top = originalDimensions.top;
-                 appWindowElement.style.transform = 'none';
-            }
-        }
-        // TODO: Bring to front
-    });
-
-    appWindowElement.addEventListener('mousedown', () => {
-        if (window.manageTaskbar) {
-            window.manageTaskbar.bringToFront(appWindowElement.id);
-        }
-    }, true);
-
-    closeButton.addEventListener('click', () => {
-        appWindowElement.style.display = 'none';
-        if (window.manageTaskbar) {
-            window.manageTaskbar.remove(appWindowElement.id);
-        }
-        taskbarButton = null;
-        
+    onClose() {
+        // Called by AppBase's close method
+        if (!this.isValid) return;
         // Reset Notepad specific state
-        const notepadTextarea = appWindowElement.querySelector('.notepad-textarea');
-        if (notepadTextarea) notepadTextarea.value = ''; // Clear text
-        isMaximized = false;
-        originalDimensions = {
-            width: appConfig.defaultWidth,
-            height: appConfig.defaultHeight,
-            top: '50%',
-            left: '50%'
-        };
-    });
-
-    if (appConfig.minimizable && minimizeButton) {
-        minimizeButton.addEventListener('click', (e) => {
-            e.stopPropagation();
-            appWindowElement.style.display = 'none';
-            if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
-        });
+        if (this.notepadTextarea) {
+            this.notepadTextarea.value = ''; // Clear text
+        }
+        // console.log(`${this.appConfig.name} closed and text cleared.`);
     }
 
-    if (appConfig.maximizable && windowHeader) {
-        windowHeader.addEventListener('dblclick', (e) => {
-            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
-            if (isMaximized) {
-                appWindowElement.classList.remove('maximized');
-                appWindowElement.style.width = originalDimensions.width;
-                appWindowElement.style.height = originalDimensions.height;
-                appWindowElement.style.top = originalDimensions.top;
-                appWindowElement.style.left = originalDimensions.left;
-                if (originalDimensions.left === '50%') {
-                    appWindowElement.style.transform = 'translate(-50%, -50%)';
-                } else {
-                    appWindowElement.style.transform = 'none';
-                }
-                isMaximized = false;
-            } else {
-                originalDimensions = {
-                    width: appWindowElement.style.width,
-                    height: appWindowElement.style.height,
-                    top: appWindowElement.style.top,
-                    left: appWindowElement.style.left
-                };
-                appWindowElement.classList.add('maximized');
-                appWindowElement.style.transform = 'none';
-                isMaximized = true;
-            }
-        });
-    }
-
-    if (windowHeader) {
-        let isDragging = false;
-        let dragOffsetX, dragOffsetY;
-        windowHeader.addEventListener('mousedown', (e) => {
-            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
-            isDragging = true;
-            // If window is centered with transform, convert its position to pixels first
-            if (appWindowElement.style.transform.includes('translate')) {
-                const rect = appWindowElement.getBoundingClientRect(); // Get current visual position
-                const parentRect = appWindowElement.parentElement.getBoundingClientRect();
-                
-                // Set left/top to pixel values based on current visual position
-                appWindowElement.style.left = `${rect.left - parentRect.left}px`;
-                appWindowElement.style.top = `${rect.top - parentRect.top}px`;
-                
-                // Now remove the transform
-                appWindowElement.style.transform = 'none';
-            }
-            // Recalculate offset AFTER position and transform have been set
-            dragOffsetX = e.clientX - appWindowElement.offsetLeft;
-            dragOffsetY = e.clientY - appWindowElement.offsetTop;
-            appWindowElement.style.cursor = 'grabbing';
-            // Bring to front is handled by the window's mousedown listener
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-            let newX = e.clientX - dragOffsetX;
-            let newY = e.clientY - dragOffsetY;
-            const desktop = document.getElementById('desktop');
-            const maxX = desktop.offsetWidth - appWindowElement.offsetWidth;
-            const maxY = desktop.offsetHeight - appWindowElement.offsetHeight;
-            newX = Math.max(0, Math.min(newX, maxX));
-            newY = Math.max(0, Math.min(newY, maxY));
-            appWindowElement.style.left = `${newX}px`;
-            appWindowElement.style.top = `${newY}px`;
-        });
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                appWindowElement.style.cursor = 'move';
-                originalDimensions.left = appWindowElement.style.left;
-                originalDimensions.top = appWindowElement.style.top;
-            }
-        });
-    }
-
-    if (appConfig.resizable && resizeHandle) {
-        let isResizing = false;
-        let resizeInitialX, resizeInitialY, initialWidth, initialHeight;
-        resizeHandle.addEventListener('mousedown', (e) => {
-            if (isMaximized) return;
-            e.stopPropagation();
-            isResizing = true;
-            resizeInitialX = e.clientX;
-            resizeInitialY = e.clientY;
-            initialWidth = appWindowElement.offsetWidth;
-            initialHeight = appWindowElement.offsetHeight;
-            appWindowElement.style.transform = 'none';
-            if (appWindowElement.style.left === '50%') {
-                appWindowElement.style.left = `${appWindowElement.offsetLeft}px`;
-                appWindowElement.style.top = `${appWindowElement.offsetTop}px`;
-            }
-            document.body.style.cursor = 'nwse-resize';
-            appWindowElement.style.userSelect = 'none';
-        });
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            const dx = e.clientX - resizeInitialX;
-            const dy = e.clientY - resizeInitialY;
-            let newWidth = initialWidth + dx;
-            let newHeight = initialHeight + dy;
-            const minWidth = parseInt(getComputedStyle(appWindowElement).minWidth, 10) || 150;
-            const minHeight = parseInt(getComputedStyle(appWindowElement).minHeight, 10) || 100;
-            newWidth = Math.max(minWidth, newWidth);
-            newHeight = Math.max(minHeight, newHeight);
-            appWindowElement.style.width = `${newWidth}px`;
-            appWindowElement.style.height = `${newHeight}px`;
-        });
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                document.body.style.cursor = 'default';
-                appWindowElement.style.userSelect = '';
-                originalDimensions.width = appWindowElement.style.width;
-                originalDimensions.height = appWindowElement.style.height;
-            }
-        });
-    }
+    // NotepadApp doesn't have much unique behavior beyond the textarea,
+    // so most functionality is handled by AppBase.
 }
+
+// Explicitly assign the class to the window object
+window.NotepadApp = NotepadApp;
