@@ -15,6 +15,14 @@
       "iconHtml": "apps/NotepadApp/icon.html",
       "bodyHtml": "apps/NotepadApp/appbody.html",
       "css": "apps/NotepadApp/style.css"
+    },
+    {
+      "name": "MediaViewer",
+      "script": "apps/MediaViewer/mediaViewer.js",
+      "initFunction": "initializeMediaViewer",
+      "iconHtml": "apps/MediaViewer/icon.html",
+      "bodyHtml": "apps/MediaViewer/appbody.html",
+      "css": "apps/MediaViewer/style.css"
     }
   ]
 }

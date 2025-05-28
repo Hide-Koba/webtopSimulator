@@ -93,4 +93,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // You can add other general desktop functionalities here
     // For example, managing focus between windows, a taskbar, etc.
+    // --- Core Desktop API Functions can be added below if needed by multiple apps ---
 });
