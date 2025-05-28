@@ -45,8 +45,14 @@ function initializeSampleApp(appConfig, appWindowElement) {
                  appWindowElement.style.transform = 'none';
             }
         }
-        // TODO: Bring to front (z-index management)
+        // TODO: Bring to front (z-index management) - now handled by mousedown on window
     });
+    
+    appWindowElement.addEventListener('mousedown', () => {
+        if (window.manageTaskbar) {
+            window.manageTaskbar.bringToFront(appWindowElement.id);
+        }
+    }, true); // Use capture phase to ensure it fires before drag/resize mousedown
 
     // --- Close window ---
     closeButton.addEventListener('click', () => {
@@ -57,17 +63,18 @@ function initializeSampleApp(appConfig, appWindowElement) {
 
     // --- Minimize window ---
     if (appConfig.minimizable && minimizeButton) {
-        minimizeButton.addEventListener('click', () => {
+        minimizeButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent event from bubbling to header or window
             appWindowElement.style.display = 'none';
             if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
-            // Note: taskbar button itself handles restore via its own click listener in script.js
         });
     }
     
     // --- Maximize/Restore window ---
     if (appConfig.maximizable && windowHeader) {
         windowHeader.addEventListener('dblclick', (e) => {
-            if (e.target === closeButton || (resizeHandle && e.target === resizeHandle)) return; // Don't maximize if clicking close/resize
+            // Ensure not clicking on any button inside the header
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
 
             if (isMaximized) {
                 // Restore
@@ -106,14 +113,27 @@ function initializeSampleApp(appConfig, appWindowElement) {
         let dragOffsetX, dragOffsetY;
 
         windowHeader.addEventListener('mousedown', (e) => {
-            if (e.target === closeButton || (resizeHandle && e.target === resizeHandle) || isMaximized) return; // Don't drag if maximized or clicking controls
+            // Ensure not clicking on any button inside the header or if maximized
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
             
             isDragging = true;
+            // If window is centered with transform, convert its position to pixels first
+            if (appWindowElement.style.transform.includes('translate')) {
+                const rect = appWindowElement.getBoundingClientRect(); // Get current visual position
+                const parentRect = appWindowElement.parentElement.getBoundingClientRect();
+                
+                // Set left/top to pixel values based on current visual position
+                appWindowElement.style.left = `${rect.left - parentRect.left}px`;
+                appWindowElement.style.top = `${rect.top - parentRect.top}px`;
+                
+                // Now remove the transform
+                appWindowElement.style.transform = 'none';
+            }
+            // Recalculate offset AFTER position and transform have been set
             dragOffsetX = e.clientX - appWindowElement.offsetLeft;
             dragOffsetY = e.clientY - appWindowElement.offsetTop;
             appWindowElement.style.cursor = 'grabbing';
-            appWindowElement.style.transform = 'none'; // Remove transform for direct positioning
-            // TODO: Bring to front
+            // Bring to front is handled by the window's mousedown listener
         });
 
         document.addEventListener('mousemove', (e) => {

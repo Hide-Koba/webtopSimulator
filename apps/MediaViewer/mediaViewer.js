@@ -126,6 +126,12 @@ function initializeMediaViewer(appConfig, appWindowElement) {
         // TODO: Bring to front
     });
 
+    appWindowElement.addEventListener('mousedown', () => {
+        if (window.manageTaskbar) {
+            window.manageTaskbar.bringToFront(appWindowElement.id);
+        }
+    }, true);
+
     // Close window
     closeButton.addEventListener('click', () => {
         appWindowElement.style.display = 'none';
@@ -135,7 +141,8 @@ function initializeMediaViewer(appConfig, appWindowElement) {
 
     // Minimize window
     if (appConfig.minimizable && minimizeButton) {
-        minimizeButton.addEventListener('click', () => {
+        minimizeButton.addEventListener('click', (e) => {
+            e.stopPropagation();
             appWindowElement.style.display = 'none';
             if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
         });
@@ -144,7 +151,7 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     // Maximize/Restore
     if (appConfig.maximizable && windowHeader) {
         windowHeader.addEventListener('dblclick', (e) => {
-            if (e.target === closeButton || e.target === selectFolderButton || (resizeHandle && e.target === resizeHandle)) return;
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle)) return;
             if (isMaximized) {
                 appWindowElement.classList.remove('maximized');
                 appWindowElement.style.width = originalDimensions.width;
@@ -176,13 +183,25 @@ function initializeMediaViewer(appConfig, appWindowElement) {
         let isDragging = false;
         let dragOffsetX, dragOffsetY;
         windowHeader.addEventListener('mousedown', (e) => {
-            if (e.target === closeButton || e.target === selectFolderButton || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
+            if (e.target.closest('button') || (resizeHandle && e.target === resizeHandle) || isMaximized) return;
             isDragging = true;
+            // If window is centered with transform, convert its position to pixels first
+            if (appWindowElement.style.transform.includes('translate')) {
+                const rect = appWindowElement.getBoundingClientRect(); // Get current visual position
+                const parentRect = appWindowElement.parentElement.getBoundingClientRect();
+                
+                // Set left/top to pixel values based on current visual position
+                appWindowElement.style.left = `${rect.left - parentRect.left}px`;
+                appWindowElement.style.top = `${rect.top - parentRect.top}px`;
+                
+                // Now remove the transform
+                appWindowElement.style.transform = 'none';
+            }
+            // Recalculate offset AFTER position and transform have been set
             dragOffsetX = e.clientX - appWindowElement.offsetLeft;
             dragOffsetY = e.clientY - appWindowElement.offsetTop;
             appWindowElement.style.cursor = 'grabbing';
-            appWindowElement.style.transform = 'none';
-            // TODO: Bring to front
+            // Bring to front is handled by the window's mousedown listener
         });
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;

@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const taskbar = document.getElementById('taskbar');
     const openWindows = new Map(); // To keep track of app windows and their taskbar buttons
+    let highestZIndex = 100; // Starting z-index for windows
 
     function loadScript(src, callback) {
         const script = document.createElement('script');
@@ -46,26 +47,22 @@ document.addEventListener('DOMContentLoaded', () => {
             button.addEventListener('click', () => {
                 const isHidden = appWindowElement.style.display === 'none';
                 if (isHidden) {
-                    appWindowElement.style.display = 'flex'; // Or 'block' if that's your default
-                    // TODO: Bring to front (z-index management)
-                    button.classList.add('active');
+                    appWindowElement.style.display = 'flex';
+                    window.manageTaskbar.bringToFront(appWindowElement.id);
                 } else {
-                    // If it's the active window, minimize it. Otherwise, bring to front.
-                    // This simple version just toggles. A more complex z-index manager would be needed.
-                    if (button.classList.contains('active') && appWindowElement.style.display !== 'none') {
+                    if (appWindowElement.style.zIndex == highestZIndex -1) { // If it's already the top-most visible window
                          appWindowElement.style.display = 'none';
-                         button.classList.remove('active');
-                    } else {
-                        appWindowElement.style.display = 'flex';
-                        // TODO: Bring to front
-                        // Deactivate other taskbar buttons
-                        taskbar.querySelectorAll('.taskbar-button.active').forEach(b => b.classList.remove('active'));
-                        button.classList.add('active');
+                         window.manageTaskbar.setInactive(appWindowElement.id);
+                    } else { // If it's not the top-most, bring it to front
+                        window.manageTaskbar.bringToFront(appWindowElement.id);
                     }
                 }
             });
             taskbar.appendChild(button);
             openWindows.set(appWindowElement.id, { windowElement: appWindowElement, taskbarButton: button, config: appConfig });
+            // Set initial z-index when added
+            appWindowElement.style.zIndex = highestZIndex++;
+            window.manageTaskbar.setActive(appWindowElement.id);
             return button;
         },
         remove: (appWindowId) => {
@@ -86,6 +83,13 @@ document.addEventListener('DOMContentLoaded', () => {
              const appData = openWindows.get(appWindowId);
             if (appData && appData.taskbarButton) {
                 appData.taskbarButton.classList.remove('active');
+            }
+        },
+        bringToFront: (appWindowId) => {
+            const appData = openWindows.get(appWindowId);
+            if (appData && appData.windowElement) {
+                appData.windowElement.style.zIndex = highestZIndex++;
+                window.manageTaskbar.setActive(appWindowId); // Also set its taskbar button as active
             }
         }
     };

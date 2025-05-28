@@ -121,8 +121,16 @@ function initializeMyApp(appConfig, appWindowElement) {
                  appWindowElement.style.transform = 'none';
             }
         }
-        // TODO: Implement z-index management to bring window to front
+        // Bring to front is handled by the window's mousedown listener, but also good to do on explicit open/restore
+        if (window.manageTaskbar) window.manageTaskbar.bringToFront(appWindowElement.id);
     });
+
+    // Add mousedown listener to the window to bring it to front
+    appWindowElement.addEventListener('mousedown', () => {
+        if (window.manageTaskbar) {
+            window.manageTaskbar.bringToFront(appWindowElement.id);
+        }
+    }, true); // Use capture phase
 
     // Close window
     closeButton.addEventListener('click', () => {
@@ -180,7 +188,7 @@ function initializeMyApp(appConfig, appWindowElement) {
             dragOffsetX = e.clientX - appWindowElement.offsetLeft;
             dragOffsetY = e.clientY - appWindowElement.offsetTop;
             appWindowElement.style.cursor = 'grabbing';
-            // TODO: Bring to front
+            // Bring to front is handled by the window's mousedown listener
         });
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;

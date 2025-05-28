@@ -8,7 +8,7 @@ Webデスクトップは以下のように構成されています。
 
 -   `index.html`: デスクトップをホストするメインHTMLファイル。タスクバー(`id="taskbar"`)も含む。
 -   `style.css`: デスクトップ、アイコン、ウィンドウ、タスクバーのグローバルスタイル。
--   `script.js`: アプリの読み込み、ウィンドウ管理（ドラッグ、リサイズ、最大化、最小化）、タスクバー管理を行うコアJavaScriptロジック。
+-   `script.js`: アプリの読み込み、ウィンドウ管理（ドラッグ、リサイズ、最大化、最小化、z-index）、タスクバー管理を行うコアJavaScriptロジック。
 -   `config.json`: 利用可能なすべてのアプリケーションとそのリソース（HTML、CSS、JSファイルパス、ウィンドウ動作設定）をリストする設定ファイル。
 -   `apps/`: すべての個別アプリケーションを格納するディレクトリ。
     -   `apps/YourAppName/`: 各アプリケーションは独自のサブディレクトリに配置されます。
@@ -56,7 +56,7 @@ Webデスクトップは以下のように構成されています。
 ### ステップ 2.4: アプリケーションJavaScriptの作成 (`myApp.js`)
 `apps/MyApp/` 内に `myApp.js` を作成します。
 初期化関数は `appConfig` と `appWindowElement` を引数に取ります。
-このスクリプトで、アイコンクリック時のウィンドウ表示、閉じるボタン、最小化ボタンのイベントリスナー、ドラッグ、リサイズ、最大化のロジックを実装します。タスクバーとの連携もここで行います。
+このスクリプトで、アイコンクリック時のウィンドウ表示、閉じるボタン、最小化ボタンのイベントリスナー、ドラッグ、リサイズ、最大化のロジックを実装します。タスクバーとの連携、ウィンドウの前面表示もここで行います。
 
 例 (`apps/MyApp/myApp.js`):
 ```javascript
@@ -86,11 +86,19 @@ function initializeMyApp(appConfig, appWindowElement) {
         if (!taskbarButton && window.manageTaskbar) { // 初回オープン時にタスクバーボタン作成
             taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
         }
-        if (window.manageTaskbar) window.manageTaskbar.setActive(appWindowElement.id);
+        // ウィンドウのmousedownリスナーが前面表示を処理しますが、明示的なオープン/復元時にも行うと良いでしょう
+        if (window.manageTaskbar) window.manageTaskbar.bringToFront(appWindowElement.id);
+
 
         if (!isMaximized) { /* サイズと位置を復元/設定 */ }
-        // TODO: z-index管理 (ウィンドウを最前面に)
     });
+    
+    // ウィンドウにmousedownリスナーを追加して前面に表示
+    appWindowElement.addEventListener('mousedown', () => {
+        if (window.manageTaskbar) {
+            window.manageTaskbar.bringToFront(appWindowElement.id);
+        }
+    }, true); // キャプチャフェーズを使用
 
     // 閉じるボタン
     closeButton.addEventListener('click', () => {
@@ -113,7 +121,10 @@ function initializeMyApp(appConfig, appWindowElement) {
     }
 
     // ドラッグ処理 (windowHeader)
-    if (windowHeader) { /* ...ドラッグロジック... */ }
+    if (windowHeader) { 
+        // ...ドラッグロジック... 
+        // mousedown内で: 前面表示はウィンドウのmousedownリスナーが処理
+    }
 
     // リサイズ処理 (appConfig.resizable と resizeHandle が存在する場合)
     if (appConfig.resizable && resizeHandle) { /* ...リサイズロジック... */ }
