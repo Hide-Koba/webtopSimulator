@@ -7,10 +7,12 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     }
 
     const closeButton = appWindowElement.querySelector('.close-button');
+    const minimizeButton = appWindowElement.querySelector('.minimize-button');
     const windowHeader = appWindowElement.querySelector('.window-header');
     const resizeHandle = appWindowElement.querySelector('.window-resize-handle');
     const selectFolderButton = appWindowElement.querySelector('.media-viewer-select-folder-button');
     const mainImage = document.getElementById('media-viewer-main-image'); // Ensure this ID is unique or scoped if multiple viewers
+    let taskbarButton = null;
     const thumbnailStrip = appWindowElement.querySelector('.media-viewer-thumbnail-strip');
     const initialMessage = thumbnailStrip.querySelector('.media-viewer-message'); // This might be an issue if thumbnailStrip is cleared.
     let imageFiles = []; // To store File objects
@@ -100,6 +102,11 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     // Open window
     appIcon.addEventListener('click', () => {
         appWindowElement.style.display = 'flex';
+        if (!taskbarButton && window.manageTaskbar) {
+            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
+        }
+        if (window.manageTaskbar) window.manageTaskbar.setActive(appWindowElement.id);
+
         if (!isMaximized) {
             appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
             appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
@@ -122,7 +129,17 @@ function initializeMediaViewer(appConfig, appWindowElement) {
     // Close window
     closeButton.addEventListener('click', () => {
         appWindowElement.style.display = 'none';
+        if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id);
+        taskbarButton = null;
     });
+
+    // Minimize window
+    if (appConfig.minimizable && minimizeButton) {
+        minimizeButton.addEventListener('click', () => {
+            appWindowElement.style.display = 'none';
+            if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
+        });
+    }
 
     // Maximize/Restore
     if (appConfig.maximizable && windowHeader) {

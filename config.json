@@ -10,7 +10,8 @@
       "defaultWidth": "300px",
       "defaultHeight": "200px",
       "resizable": true,
-      "maximizable": true
+      "maximizable": true,
+      "minimizable": true
     },
     {
       "name": "NotepadApp",
@@ -22,7 +23,8 @@
       "defaultWidth": "450px",
       "defaultHeight": "350px",
       "resizable": true,
-      "maximizable": true
+      "maximizable": true,
+      "minimizable": true
     },
     {
       "name": "MediaViewer",
@@ -34,7 +36,8 @@
       "defaultWidth": "600px",
       "defaultHeight": "450px",
       "resizable": true,
-      "maximizable": true
+      "maximizable": true,
+      "minimizable": true
     }
   ]
 }

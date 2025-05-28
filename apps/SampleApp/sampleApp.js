@@ -10,8 +10,10 @@ function initializeSampleApp(appConfig, appWindowElement) {
     }
 
     const closeButton = appWindowElement.querySelector('.close-button');
+    const minimizeButton = appWindowElement.querySelector('.minimize-button'); // Added by script.js
     const windowHeader = appWindowElement.querySelector('.window-header');
     const resizeHandle = appWindowElement.querySelector('.window-resize-handle'); // May be null if not resizable
+    let taskbarButton = null;
 
     // --- Store original dimensions for restoring from maximized ---
     let originalDimensions = {
@@ -25,12 +27,15 @@ function initializeSampleApp(appConfig, appWindowElement) {
     // --- Open window ---
     appIcon.addEventListener('click', () => {
         appWindowElement.style.display = 'flex';
-        // Reset to default/last size and position if not maximized
+        if (!taskbarButton && window.manageTaskbar) { // Create taskbar button on first open
+            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
+        }
+        if (window.manageTaskbar) window.manageTaskbar.setActive(appWindowElement.id);
+
         if (!isMaximized) {
             appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
             appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
-            // Recenter if needed, or use stored position
-            if (!originalDimensions.left || originalDimensions.left === "50%") { // Check if it was centered
+            if (!originalDimensions.left || originalDimensions.left === "50%") {
                  appWindowElement.style.left = '50%';
                  appWindowElement.style.top = '50%';
                  appWindowElement.style.transform = 'translate(-50%, -50%)';
@@ -46,8 +51,19 @@ function initializeSampleApp(appConfig, appWindowElement) {
     // --- Close window ---
     closeButton.addEventListener('click', () => {
         appWindowElement.style.display = 'none';
+        if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id); // Remove from taskbar
+        taskbarButton = null; // Reset taskbar button ref
     });
 
+    // --- Minimize window ---
+    if (appConfig.minimizable && minimizeButton) {
+        minimizeButton.addEventListener('click', () => {
+            appWindowElement.style.display = 'none';
+            if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
+            // Note: taskbar button itself handles restore via its own click listener in script.js
+        });
+    }
+    
     // --- Maximize/Restore window ---
     if (appConfig.maximizable && windowHeader) {
         windowHeader.addEventListener('dblclick', (e) => {

@@ -7,8 +7,10 @@ function initializeNotepadApp(appConfig, appWindowElement) {
     }
 
     const closeButton = appWindowElement.querySelector('.close-button');
+    const minimizeButton = appWindowElement.querySelector('.minimize-button');
     const windowHeader = appWindowElement.querySelector('.window-header');
     const resizeHandle = appWindowElement.querySelector('.window-resize-handle');
+    let taskbarButton = null;
 
     let originalDimensions = {
         width: appWindowElement.style.width,
@@ -20,6 +22,11 @@ function initializeNotepadApp(appConfig, appWindowElement) {
 
     appIcon.addEventListener('click', () => {
         appWindowElement.style.display = 'flex';
+        if (!taskbarButton && window.manageTaskbar) {
+            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
+        }
+        if (window.manageTaskbar) window.manageTaskbar.setActive(appWindowElement.id);
+
         if (!isMaximized) {
             appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
             appWindowElement.style.height = originalDimensions.height || appConfig.defaultHeight;
@@ -38,7 +45,16 @@ function initializeNotepadApp(appConfig, appWindowElement) {
 
     closeButton.addEventListener('click', () => {
         appWindowElement.style.display = 'none';
+        if (window.manageTaskbar) window.manageTaskbar.remove(appWindowElement.id);
+        taskbarButton = null;
     });
+
+    if (appConfig.minimizable && minimizeButton) {
+        minimizeButton.addEventListener('click', () => {
+            appWindowElement.style.display = 'none';
+            if (window.manageTaskbar) window.manageTaskbar.setInactive(appWindowElement.id);
+        });
+    }
 
     if (appConfig.maximizable && windowHeader) {
         windowHeader.addEventListener('dblclick', (e) => {

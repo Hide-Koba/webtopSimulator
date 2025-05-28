@@ -85,9 +85,12 @@ function initializeMyApp(appConfig, appWindowElement) {
     }
 
     const closeButton = appWindowElement.querySelector('.close-button');
+    // Minimize button is added by script.js if appConfig.minimizable is true
+    const minimizeButton = appWindowElement.querySelector('.minimize-button'); 
     const windowHeader = appWindowElement.querySelector('.window-header');
     // Resize handle is added by script.js if appConfig.resizable is true
     const resizeHandle = appWindowElement.querySelector('.window-resize-handle'); 
+    let taskbarButton = null; // To store reference to this app's taskbar button
 
     let originalDimensions = { /* Store for restore from maximize */
         width: appWindowElement.style.width, height: appWindowElement.style.height,
@@ -98,6 +101,14 @@ function initializeMyApp(appConfig, appWindowElement) {
     // Open window
     appIcon.addEventListener('click', () => {
         appWindowElement.style.display = 'flex';
+        // Create or get taskbar button and set as active
+        if (!taskbarButton && window.manageTaskbar) {
+            taskbarButton = window.manageTaskbar.add(appConfig, appWindowElement);
+        }
+        if (window.manageTaskbar) {
+            window.manageTaskbar.setActive(appWindowElement.id);
+        }
+
         if (!isMaximized) {
             // Apply default or stored dimensions/position
             appWindowElement.style.width = originalDimensions.width || appConfig.defaultWidth;
@@ -114,7 +125,24 @@ function initializeMyApp(appConfig, appWindowElement) {
     });
 
     // Close window
-    closeButton.addEventListener('click', () => appWindowElement.style.display = 'none');
+    closeButton.addEventListener('click', () => {
+        appWindowElement.style.display = 'none';
+        if (window.manageTaskbar) {
+            window.manageTaskbar.remove(appWindowElement.id); // Remove from taskbar
+        }
+        taskbarButton = null; // Reset reference
+    });
+
+    // Minimize window
+    if (appConfig.minimizable && minimizeButton) {
+        minimizeButton.addEventListener('click', () => {
+            appWindowElement.style.display = 'none';
+            if (window.manageTaskbar) {
+                window.manageTaskbar.setInactive(appWindowElement.id);
+            }
+            // The taskbar button itself (created in script.js) will handle restoring the window.
+        });
+    }
 
     // Maximize/Restore on header double-click
     if (appConfig.maximizable && windowHeader) {
@@ -229,6 +257,7 @@ Add a new entry for your application in the `apps` array within `config.json`. I
 - `defaultHeight` (string, e.g., "300px")
 - `resizable` (boolean, `true` or `false`)
 - `maximizable` (boolean, `true` or `false`)
+- `minimizable` (boolean, `true` or `false`)
 
 Example entry for "MyApp":
 ```json
@@ -242,7 +271,8 @@ Example entry for "MyApp":
   "defaultWidth": "400px",
   "defaultHeight": "300px",
   "resizable": true,
-  "maximizable": true
+  "maximizable": true,
+  "minimizable": true
 }
 ```
 Ensure this new object is added as an element in the `apps` array, maintaining correct JSON syntax.
