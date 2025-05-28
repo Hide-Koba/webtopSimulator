@@ -1,0 +1,18 @@
+{
+  "apps": [
+    {
+      "name": "SampleApp",
+      "script": "apps/SampleApp/sampleApp.js",
+      "initFunction": "initializeSampleApp",
+      "iconHtml": "apps/SampleApp/icon.html",
+      "bodyHtml": "apps/SampleApp/appbody.html"
+    },
+    {
+      "name": "NotepadApp",
+      "script": "apps/NotepadApp/notepadApp.js",
+      "initFunction": "initializeNotepadApp",
+      "iconHtml": "apps/NotepadApp/icon.html",
+      "bodyHtml": "apps/NotepadApp/appbody.html"
+    }
+  ]
+}

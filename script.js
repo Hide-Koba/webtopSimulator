@@ -12,24 +12,67 @@ document.addEventListener('DOMContentLoaded', () => {
         document.head.appendChild(script);
     }
 
-    // Define the apps to load
-    // In a more advanced setup, this could be fetched from a config file or by scanning the /apps directory
-    const appsToLoad = [
-        { name: 'SampleApp', script: 'apps/sampleApp.js', initFunction: 'initializeSampleApp' }
-        // Add more apps here in the future
-        // { name: 'AnotherApp', script: 'apps/anotherApp.js', initFunction: 'initializeAnotherApp' }
-    ];
+    // Function to fetch HTML content and inject it into the DOM
+    function fetchAndInjectHTML(url, targetElement) {
+        return fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status} for ${url}`);
+                }
+                return response.text();
+            })
+            .then(html => {
+                targetElement.insertAdjacentHTML('beforeend', html);
+            })
+            .catch(error => {
+                console.error(`Error fetching or injecting HTML from ${url}:`, error);
+            });
+    }
 
-    // Load and initialize each app
-    appsToLoad.forEach(app => {
-        loadScript(app.script, () => {
-            if (window[app.initFunction] && typeof window[app.initFunction] === 'function') {
-                window[app.initFunction]();
-            } else {
-                console.error(`Initialization function ${app.initFunction} not found for ${app.name}`);
+    // Function to fetch app configuration and then load apps
+    async function loadAppsFromConfig() {
+        try {
+            const response = await fetch('config.json');
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-        });
-    });
+            const config = await response.json();
+
+            if (config && config.apps && Array.isArray(config.apps)) {
+                const desktopElement = document.getElementById('desktop');
+                if (!desktopElement) {
+                    console.error('Desktop element not found!');
+                    return;
+                }
+
+                for (const app of config.apps) {
+                    // Load HTML for icon and body first
+                    if (app.iconHtml) {
+                        await fetchAndInjectHTML(app.iconHtml, desktopElement);
+                    }
+                    if (app.bodyHtml) {
+                        await fetchAndInjectHTML(app.bodyHtml, desktopElement);
+                    }
+
+                    // Then load the script and initialize
+                    loadScript(app.script, () => {
+                        if (window[app.initFunction] && typeof window[app.initFunction] === 'function') {
+                            window[app.initFunction]();
+                        } else {
+                            console.error(`Initialization function ${app.initFunction} not found for ${app.name}`);
+                        }
+                    });
+                }
+            } else {
+                console.error('Invalid config.json format.');
+            }
+        } catch (error) {
+            console.error('Error loading or parsing config.json:', error);
+        }
+    }
+
+    // Start loading apps
+    loadAppsFromConfig();
 
     // You can add other general desktop functionalities here
     // For example, managing focus between windows, a taskbar, etc.

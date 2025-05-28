@@ -73,4 +73,18 @@ body, html {
     padding: 15px;
     flex-grow: 1;
     overflow-y: auto;
+    display: flex; /* Ensure textarea can fill the space */
+    flex-direction: column; /* Ensure textarea can fill the space */
+}
+
+.notepad-textarea {
+    width: 100%;
+    height: 100%;
+    flex-grow: 1; /* Allow textarea to fill content area */
+    border: none;
+    resize: none; /* Disable resizing by user */
+    box-sizing: border-box; /* Include padding and border in the element's total width and height */
+    font-family: monospace;
+    font-size: 14px;
+    padding: 0; /* Remove default padding if any */
 }
